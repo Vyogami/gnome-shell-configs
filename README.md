@@ -33,7 +33,7 @@ These extensions provide additional functionality, customization options, and co
 It contains my custom theme along with some of my favorite themes.
 
 - **codereaper**: this is my custom theme.
-    ![codereaper-theme](./assets/codereaper-desktop.png)
+    ![codereaper-theme](./assets/codereaper-desktop-min.png)
 
 ## Usage
 
