@@ -1,1 +1,6 @@
-/home/codereaper/.dotfiles/gnome-shell/extensions/asusctl-gex@asus-linux.org/modules/popup.js
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+var Menu = class Menu {
+    constructor() {
+    }
+}
+//# sourceMappingURL=popup.js.map

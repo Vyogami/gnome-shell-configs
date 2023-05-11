@@ -1,1 +1,4 @@
-/home/codereaper/.dotfiles/gnome-shell/extensions/supergfxctl-gex@asus-linux.org/stylesheet.css
+.supergfxctl-gex.panel-icon {
+  width: 16px;
+  height: 16px;
+}
