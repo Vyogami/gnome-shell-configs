@@ -1,8 +1,1 @@
-[Theme]
-Name=Vertex
-
-[Dark]
-Style=stylesheet.css
-
-[Light]
-Style=stylesheet.css
+/home/codereaper/.dotfiles/gnome-shell/extensions/unite@hardpixel.eu/themes/vertex/unite.theme

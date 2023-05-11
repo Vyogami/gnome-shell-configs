@@ -1,13 +1,1 @@
-window headerbar windowhandle {
-  margin-right: -6px;
-}
-
-window headerbar windowcontrols.end {
-  margin: 0 -200px 0 0;
-  opacity: 0;
-}
-
-window .titlebar.default-decoration {
-  margin: -200px 0 0;
-  opacity: 0;
-}
+/home/codereaper/.dotfiles/gnome-shell/extensions/unite@hardpixel.eu/styles/gtk4/buttons-right/always.css

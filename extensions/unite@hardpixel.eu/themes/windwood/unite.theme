@@ -1,8 +1,1 @@
-[Theme]
-Name=Windwood
-
-[Dark]
-Style=stylesheet.css
-
-[Light]
-Style=stylesheet.css
+/home/codereaper/.dotfiles/gnome-shell/extensions/unite@hardpixel.eu/themes/windwood/unite.theme

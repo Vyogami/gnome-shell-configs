@@ -1,8 +1,1 @@
-[Theme]
-Name=McMojave
-
-[Dark]
-Style=stylesheet.css
-
-[Light]
-Style=stylesheet.css
+/home/codereaper/.dotfiles/gnome-shell/extensions/unite@hardpixel.eu/themes/mcmojave/unite.theme

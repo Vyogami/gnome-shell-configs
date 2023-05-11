@@ -1,13 +1,1 @@
-.tiled headerbar windowhandle {
-  margin-left: -6px;
-}
-
-.tiled headerbar windowcontrols.start {
-  margin: 0 0 0 -200px;
-  opacity: 0;
-}
-
-.tiled .titlebar.default-decoration {
-  margin: -200px 0 0;
-  opacity: 0;
-}
+/home/codereaper/.dotfiles/gnome-shell/extensions/unite@hardpixel.eu/styles/gtk4/buttons-left/tiled.css

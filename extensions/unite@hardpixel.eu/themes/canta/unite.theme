@@ -1,8 +1,1 @@
-[Theme]
-Name=Canta
-
-[Dark]
-Style=stylesheet.css
-
-[Light]
-Style=stylesheet.css
+/home/codereaper/.dotfiles/gnome-shell/extensions/unite@hardpixel.eu/themes/canta/unite.theme
