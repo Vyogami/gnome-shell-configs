@@ -1,6 +1,6 @@
 # gnome shell files and directories
-./application_state
-./extension-updates/
-./gnome-overrides-migrated
-./material-shell-state
-./notifications
+application_state
+extension-updates/
+gnome-overrides-migrated
+material-shell-state
+notifications
