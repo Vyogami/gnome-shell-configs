@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/openweather-extension@jenslody.de/locale/hu/LC_MESSAGES/gnome-shell-extension-openweather.mo

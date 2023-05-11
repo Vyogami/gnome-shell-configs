@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/just-perfection-desktop@just-perfection/locale/ru/LC_MESSAGES/just-perfection.mo

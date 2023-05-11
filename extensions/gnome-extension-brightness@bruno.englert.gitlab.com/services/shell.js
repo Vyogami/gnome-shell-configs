@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/gnome-extension-brightness@bruno.englert.gitlab.com/services/shell.js

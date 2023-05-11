@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/color-picker@tuberry/locale/de_DE/LC_MESSAGES/gnome-shell-extension-color-picker.mo

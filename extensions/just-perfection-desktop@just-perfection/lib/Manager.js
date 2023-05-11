@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/just-perfection-desktop@just-perfection/lib/Manager.js

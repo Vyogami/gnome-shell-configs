@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/bluetooth-quick-connect@bjarosze.gmail.com/locale/nl/LC_MESSAGES/bluetooth-quick-connect.mo

@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/quick-settings-tweaks@qwreey/locale/pt/LC_MESSAGES/quick-settings-tweaks.mo

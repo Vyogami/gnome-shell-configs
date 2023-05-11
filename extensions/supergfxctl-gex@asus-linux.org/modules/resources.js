@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/supergfxctl-gex@asus-linux.org/modules/resources.js

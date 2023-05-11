@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/scroll-workspaces@gfxmonk.net/locale/de/LC_MESSAGES/scroll-workspaces.mo

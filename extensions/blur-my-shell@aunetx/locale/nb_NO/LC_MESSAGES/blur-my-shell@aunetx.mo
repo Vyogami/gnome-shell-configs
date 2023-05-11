@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/blur-my-shell@aunetx/locale/nb_NO/LC_MESSAGES/blur-my-shell@aunetx.mo

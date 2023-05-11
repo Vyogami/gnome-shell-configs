@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/openweather-extension@jenslody.de/prefs.js

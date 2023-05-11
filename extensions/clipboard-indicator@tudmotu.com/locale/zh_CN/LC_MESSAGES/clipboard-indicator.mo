@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/clipboard-indicator@tudmotu.com/locale/zh_CN/LC_MESSAGES/clipboard-indicator.mo

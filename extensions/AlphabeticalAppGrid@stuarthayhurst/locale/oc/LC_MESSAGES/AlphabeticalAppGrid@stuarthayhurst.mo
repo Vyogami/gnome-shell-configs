@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/AlphabeticalAppGrid@stuarthayhurst/locale/oc/LC_MESSAGES/AlphabeticalAppGrid@stuarthayhurst.mo

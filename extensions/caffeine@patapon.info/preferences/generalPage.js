@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/caffeine@patapon.info/preferences/generalPage.js

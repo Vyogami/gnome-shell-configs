@@ -1,0 +1,1 @@
+/home/codereaper/.dotfiles/gnome-shell/extensions/bluetooth-quick-connect@bjarosze.gmail.com/quickSettings.js
