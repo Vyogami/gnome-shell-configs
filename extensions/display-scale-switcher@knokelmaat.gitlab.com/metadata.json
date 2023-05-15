@@ -3,9 +3,9 @@
   "description": "Quickly change the display scaling factor from the system menu.",
   "name": "Display Scale Switcher",
   "shell-version": [
-    "43"
+    "44"
   ],
   "url": "https://gitlab.com/knokelmaat/display-scale-switcher-gnome-extension",
   "uuid": "display-scale-switcher@knokelmaat.gitlab.com",
-  "version": 3
+  "version": 4
 }

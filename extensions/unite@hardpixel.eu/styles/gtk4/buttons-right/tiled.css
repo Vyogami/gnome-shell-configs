@@ -1,1 +1,13 @@
-/home/codereaper/.dotfiles/gnome-shell/extensions/unite@hardpixel.eu/styles/gtk4/buttons-right/tiled.css
+.tiled headerbar windowhandle {
+  margin-right: -6px;
+}
+
+.tiled headerbar windowcontrols.end {
+  margin: 0 -200px 0 0;
+  opacity: 0;
+}
+
+.tiled .titlebar.default-decoration {
+  margin: -200px 0 0;
+  opacity: 0;
+}

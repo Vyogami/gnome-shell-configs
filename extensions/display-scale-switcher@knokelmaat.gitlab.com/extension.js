@@ -46,7 +46,7 @@ const DisplayScaleQuickMenuToggle = GObject.registerClass(
         _init() {
             // Set QuickMenu name and icon
             super._init({
-                label: _('Display Scale'),
+                title: _('Display Scale'),
                 iconName: 'video-display-symbolic',
                 toggleMode: true,
             });
@@ -75,7 +75,7 @@ const DisplayScaleQuickMenuToggle = GObject.registerClass(
         }
         
         _updateCurrentScale(scale) {
-            this.label = _('Scale: ') + scaleToPercentage(scale) + ' %';
+            this.title = _('Scale: ') + scaleToPercentage(scale) + ' %';
             
             this.checked = scaleToPercentage(scale) !== 100;
             

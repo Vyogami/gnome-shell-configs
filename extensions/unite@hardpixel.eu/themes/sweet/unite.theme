@@ -1,1 +1,8 @@
-/home/codereaper/.dotfiles/gnome-shell/extensions/unite@hardpixel.eu/themes/sweet/unite.theme
+[Theme]
+Name=Sweet
+
+[Dark]
+Style=stylesheet.css
+
+[Light]
+Style=stylesheet.css

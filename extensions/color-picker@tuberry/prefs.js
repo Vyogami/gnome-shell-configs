@@ -7,13 +7,9 @@ const { Adw, Gio, Gtk, GObject, Gdk, GLib } = imports.gi;
 
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
-const _ = ExtensionUtils.gettext;
-const { Fields, Block } = Me.imports.fields;
+const { _, fl, genParam, fquery } = Me.imports.util;
+const { Field } = Me.imports.const;
 const UI = Me.imports.ui;
-
-const genParam = (type, name, ...dflt) => GObject.ParamSpec[type](name, name, name, GObject.ParamFlags.READWRITE, ...dflt);
-
-Gio._promisify(Gio.File.prototype, 'query_info_async');
 
 function buildPrefsWidget() {
     return new ColorPickerPrefs();
@@ -38,8 +34,8 @@ class IconBtn extends UI.File {
     }
 
     async _setFile(path) {
-        let file = Gio.File.new_for_path(path);
-        let info = await file.query_info_async(this._attr, Gio.FileQueryInfoFlags.NONE, GLib.PRIORITY_DEFAULT, null);
+        let file = fl(path);
+        let info = await fquery(file, this._attr);
         this._setLabel(info.get_name().replace(RegExp(/(-symbolic)*.svg$/), ''));
         let icon = this._checkIcon(path);
         icon ? this._icon.set_from_icon_name(icon) : this._icon.set_from_gicon(Gio.Icon.new_for_string(path));
@@ -73,7 +69,7 @@ var KeyBtn = class extends Gtk.Box {
         this.bind_property('key', label, 'accelerator', GObject.BindingFlags.DEFAULT);
         this._btn = new Gtk.Button({ child: label });
         let reset = new Gtk.Button({ icon_name: 'edit-clear-symbolic', tooltip_text: _('Clear') });
-        reset.connect('clicked', () => (this.key = ''));
+        reset.connect('clicked', () => { this.key = ''; });
         this._btn.connect('clicked', this._onActivated.bind(this));
         [this._btn, reset].forEach(x => this.append(x));
     }
@@ -114,34 +110,34 @@ class ColorPickerPrefs extends Adw.PreferencesGroup {
     }
 
     _buildWidgets() {
-        this._block = new Block({
-            m_key:   [Fields.MENUKEY,        'key',      new KeyBtn()],
-            q_key:   [Fields.QUITKEY,        'key',      new KeyBtn()],
-            tray:    [Fields.SYSTRAYICON,    'file',     new IconBtn()],
-            copy:    [Fields.AUTOCOPY,       'active',   new Gtk.CheckButton()],
-            en_ntf:  [Fields.ENABLENOTIFY,   'active',   new Gtk.CheckButton()],
-            en_fmt:  [Fields.ENABLEFORMAT,   'active',   new Gtk.CheckButton()],
-            en_view: [Fields.ENABLEPREVIEW,  'active',   new Gtk.CheckButton()],
-            en_keys: [Fields.ENABLESHORTCUT, 'active',   new Gtk.CheckButton()],
-            en_tray: [Fields.ENABLESYSTRAY,  'active',   new Gtk.CheckButton()],
-            persist: [Fields.PERSISTENTMODE, 'active',   new Gtk.CheckButton()],
-            notify:  [Fields.NOTIFYSTYLE,    'selected', new UI.Drop([_('MSG'), _('OSD')])],
-            m_size:  [Fields.MENUSIZE,       'value',    new UI.Spin(1, 16, 1, _('history size'))],
-            fmt:     [Fields.FORMAT,         'selected', new UI.Drop(['HEX', 'RGB', 'HSL', 'hex', 'HSV', 'CMYK'])],
-            view:    [Fields.PREVIEW,        'selected', new UI.Drop([_('Icon'), _('Label')], _('preview style'))],
+        this._blk = new UI.Block({
+            m_key:   [Field.MENUKEY,        'key',      new KeyBtn()],
+            q_key:   [Field.QUITKEY,        'key',      new KeyBtn()],
+            tray:    [Field.SYSTRAYICON,    'file',     new IconBtn()],
+            copy:    [Field.AUTOCOPY,       'active',   new Gtk.CheckButton()],
+            en_ntf:  [Field.ENABLENOTIFY,   'active',   new Gtk.CheckButton()],
+            en_fmt:  [Field.ENABLEFORMAT,   'active',   new Gtk.CheckButton()],
+            en_view: [Field.ENABLEPREVIEW,  'active',   new Gtk.CheckButton()],
+            en_keys: [Field.ENABLESHORTCUT, 'active',   new Gtk.CheckButton()],
+            en_tray: [Field.ENABLESYSTRAY,  'active',   new Gtk.CheckButton()],
+            persist: [Field.PERSISTENTMODE, 'active',   new Gtk.CheckButton()],
+            notify:  [Field.NOTIFYSTYLE,    'selected', new UI.Drop([_('MSG'), _('OSD')])],
+            m_size:  [Field.MENUSIZE,       'value',    new UI.Spin(1, 16, 1, _('history size'))],
+            fmt:     [Field.FORMAT,         'selected', new UI.Drop(['HEX', 'RGB', 'HSL', 'hex', 'HSV', 'CMYK'])],
+            view:    [Field.PREVIEW,        'selected', new UI.Drop([_('Icon'), _('Label')], _('preview style'))],
         });
-        this._block.keys = new UI.Keys(this._block.gset, Fields.PICKSHORTCUT);
+        this._blk.keys = new UI.Keys(this._blk.gset, Field.PICKSHORTCUT);
     }
 
     _buildUI() {
         [
-            [this._block.copy,    [_('Automatically copy'), _('copy the color to clipboard after picking')]],
-            [this._block.en_fmt,  [_('Default format'), _('hex here means poundless HEX such as “8fd0da”')], this._block.fmt],
-            [this._block.en_keys, [_('Shortcut to pick'), _('press arrow keys / wasd / hjkl to move by pixel')], this._block.keys],
-            [this._block.en_ntf,  [_('Notification style'), _('notify the color after picking')], this._block.notify],
-            [this._block.persist, [_('Persistent mode'), _('right click or press Esc key to quit')], this._block.q_key],
-            [this._block.en_view, [_('Enable preview'), _('middle click or press Menu key to open menu')], this._block.view, this._block.m_key],
-            [this._block.en_tray, [_('Enable systray'), _('right click to open menu')], this._block.tray, this._block.m_size],
+            [this._blk.copy,    [_('Automatically copy'), _('copy the color to clipboard after picking')]],
+            [this._blk.en_fmt,  [_('Default format'), _('hex here means poundless HEX such as “8fd0da”')], this._blk.fmt],
+            [this._blk.en_keys, [_('Shortcut to pick'), _('press arrow keys / wasd / hjkl to move by pixel')], this._blk.keys],
+            [this._blk.en_ntf,  [_('Notification style'), _('notify the color after picking')], this._blk.notify],
+            [this._blk.persist, [_('Persistent mode'), _('right click or press Esc key to quit')], this._blk.q_key],
+            [this._blk.en_view, [_('Enable preview'), _('middle click or press Menu key to open menu')], this._blk.view, this._blk.m_key],
+            [this._blk.en_tray, [_('Enable systray'), _('right click to open menu')], this._blk.tray, this._blk.m_size],
         ].forEach(xs => this.add(new UI.PrefRow(...xs)));
     }
 }

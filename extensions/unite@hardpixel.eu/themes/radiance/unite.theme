@@ -1,1 +1,8 @@
-/home/codereaper/.dotfiles/gnome-shell/extensions/unite@hardpixel.eu/themes/radiance/unite.theme
+[Theme]
+Name=Radiance
+
+[Dark]
+Style=stylesheet.css
+
+[Light]
+Style=stylesheet.css

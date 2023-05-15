@@ -13,8 +13,9 @@ const { Gio, St, Shell, GObject, Clutter, Meta } = imports.gi;
 
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
-const { Fields, Field } = Me.imports.fields;
-const _ = ExtensionUtils.gettext;
+const { Field } = Me.imports.const;
+const { _, xnor } = Me.imports.util;
+const { Fulu, Extension: Ext, Symbiont, DEventEmitter } = Me.imports.fubar;
 
 const setCursor = x => global.display.set_cursor(Meta.Cursor[x]);
 const setClipboard = x => St.Clipboard.get_default().set_text(St.ClipboardType.CLIPBOARD, x);
@@ -64,7 +65,7 @@ class Color {
         switch(f) {
         case Format.HEX:
         case Format.RGB:
-            return Clutter.Color.from_string(t)[1];
+            return Clutter.Color.from_string(t).at(1);
         case Format.HSL: {
             let [h, s, l] = t.slice(4, -1).split(',').map((x, i) => parseInt(x) / (i ? 100 : 1));
             return Clutter.Color.from_hls(h, l, s);
@@ -79,7 +80,7 @@ class Color {
             let { r, g, b } = this.cmyk2rgb({ c, m, y, k });
             return new Clutter.Color({ red: r, green: g, blue: b });
         }
-        default: return Clutter.Color.from_string(`#${t}`)[1];
+        default: return Clutter.Color.from_string(`#${t}`).at(1);
         }
     }
 
@@ -273,7 +274,7 @@ class ColorSlider extends Slider.Slider {
         let key = event.keyval;
         if(key === Clutter.KEY_Right || key === Clutter.KEY_Left) {
             let delta = key === Clutter.KEY_Right ? this.step : -this.step;
-            this.value = Math.max(0, Math.min(this._value + delta, this._maxValue));
+            this.value = Math.clamp(this._value + delta, 0, this._maxValue);
             return Clutter.EVENT_STOP;
         }
         return super.vfunc_key_press_event(event);
@@ -285,11 +286,11 @@ class ColorSlider extends Slider.Slider {
             switch(direction) {
             case Clutter.ScrollDirection.UP: return 1;
             case Clutter.ScrollDirection.DOWN: return -1;
-            case Clutter.ScrollDirection.SMOOTH: return -event.get_scroll_delta()[1];
+            case Clutter.ScrollDirection.SMOOTH: return -event.get_scroll_delta().at(1);
             default: return 0;
             }
         })(event.get_scroll_direction());
-        this.value = Math.min(Math.max(0, this._value + delta * this.step), this._maxValue);
+        this.value = Math.clamp(this._value + delta * this.step, 0, this._maxValue);
         return Clutter.EVENT_STOP;
     }
 }
@@ -303,7 +304,7 @@ class SliderItem extends PopupMenu.PopupBaseMenuItem {
         super({ activate: false });
         let label = new St.Label({ text, x_expand: false });
         this._slider = new ColorSlider(numb, base);
-        this._slider.connect('notify::value', () => (this._slider._dragging || this.active) && callback(this._slider.numb));
+        this._slider.connect('notify::value', () => { if(this._slider._dragging || this.active) callback(this._slider.numb); });
         this.connect('button-press-event', (_a, event) => this._slider.startDragging(event));
         this.connect('key-press-event', (_a, event) => this._slider.emit('key-press-event', event));
         this.connect('scroll-event', (_a, event) => this._slider.emit('scroll-event', event));
@@ -418,6 +419,7 @@ class ColorLabel extends BoxPointer.BoxPointer {
         this.bin.set_child(this._label);
         let s = Math.round(Meta.prefs_get_cursor_size() * 0.8);
         this._cursor = new Clutter.Actor({ opacity: 0, width: s, height: s });
+        new Symbiont(() => { this._cursor.destroy(); this._cursor = null; }, this);
         Main.uiGroup.add_actor(this._cursor);
         this.setCursor(true);
     }
@@ -431,12 +433,6 @@ class ColorLabel extends BoxPointer.BoxPointer {
         this._cursor.set_position(x, y);
         this.setPosition(this._cursor, 0);
         this.show();
-    }
-
-    destroy() {
-        this._cursor.destroy();
-        this._cursor = null;
-        super.destroy();
     }
 }
 
@@ -475,25 +471,26 @@ class ColorArea extends St.Widget {
         }, this);
     }
 
-    constructor({ field, once, format }) {
+    constructor({ fulu, once, format }) {
         super({ reactive: true });
         setCursor('CROSSHAIR');
         this.once = once ?? false;
         this._picker = new Shell.Screenshot();
         this._color = new Color(null, format ?? Format.HEX);
         this._pointer = Clutter.get_default_backend().get_default_seat().create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+        new Symbiont(() => { this.preview = this._pointer = this._picker = null; setCursor('DEFAULT'); }, this);
         this.connect('popup-menu', () => this._menu?.open(this._color));
         this.set_size(...global.display.get_size());
-        this._bindSettings(field);
+        this._bindSettings(fulu);
     }
 
-    _bindSettings(field) {
-        this._field = field.attach({
-            pvstyle: [Fields.PREVIEW,        'uint'],
-            menukey: [Fields.MENUKEY,        'string'],
-            quitkey: [Fields.QUITKEY,        'string'],
-            persist: [Fields.PERSISTENTMODE, 'boolean'],
-            preview: [Fields.ENABLEPREVIEW,  'boolean'],
+    _bindSettings(fulu) {
+        this._fulu = fulu.attach({
+            pvstyle: [Field.PREVIEW,        'uint'],
+            menukey: [Field.MENUKEY,        'string'],
+            quitkey: [Field.QUITKEY,        'string'],
+            persist: [Field.PERSISTENTMODE, 'boolean'],
+            preview: [Field.ENABLEPREVIEW,  'boolean'],
         }, this);
     }
 
@@ -509,8 +506,8 @@ class ColorArea extends St.Widget {
     }
 
     set preview(preview) {
+        if(xnor(preview, this._view)) return;
         if(preview) {
-            if(this._view) return;
             this._pick();
             this._view = this.pvstyle ? new ColorLabel() : new ColorIcon();
             this._view.setCursor(true);
@@ -519,7 +516,6 @@ class ColorArea extends St.Widget {
                 'open-state-changed', (_a, open) => this._view?.setCursor(!open),
                 'color-selected', (_a, color) => this._emitColor(color), this);
         } else {
-            if(!this._view) return;
             ['_view', '_menu'].forEach(x => { this[x].destroy(); this[x] = null; });
         }
     }
@@ -543,16 +539,16 @@ class ColorArea extends St.Widget {
         switch(keyval) {
         case Clutter.KEY_a:
         case Clutter.KEY_h:
-        case Clutter.KEY_Left:   this._moveCursorTo(-1, 0); break;
+        case Clutter.KEY_Left:  this._moveCursorTo(-1, 0); break;
         case Clutter.KEY_w:
         case Clutter.KEY_k:
-        case Clutter.KEY_Up:     this._moveCursorTo(0, -1); break;
+        case Clutter.KEY_Up:    this._moveCursorTo(0, -1); break;
         case Clutter.KEY_d:
         case Clutter.KEY_l:
-        case Clutter.KEY_Right:  this._moveCursorTo(1, 0); break;
+        case Clutter.KEY_Right: this._moveCursorTo(1, 0); break;
         case Clutter.KEY_s:
         case Clutter.KEY_j:
-        case Clutter.KEY_Down:   this._moveCursorTo(0, 1); break;
+        case Clutter.KEY_Down:  this._moveCursorTo(0, 1); break;
         }
     }
 
@@ -577,13 +573,6 @@ class ColorArea extends St.Widget {
         }
         return Clutter.EVENT_PROPAGATE;
     }
-
-    destroy() {
-        this._field.detach(this);
-        this.preview = this._pointer = this._picker = null;
-        setCursor('DEFAULT');
-        super.destroy();
-    }
 }
 
 class ColorButton extends PanelMenu.Button {
@@ -595,10 +584,10 @@ class ColorButton extends PanelMenu.Button {
         }, this);
     }
 
-    constructor(field, ...params) {
+    constructor(fulu, ...params) {
         super(...params);
         this._buildWidgets();
-        this._bindSettings(field);
+        this._bindSettings(fulu);
         this._addMenuItems();
     }
 
@@ -609,16 +598,16 @@ class ColorButton extends PanelMenu.Button {
         this.add_actor(this._icon);
     }
 
-    _bindSettings(field) {
-        this._field = field.attach({
-            format:     [Fields.FORMAT,        'uint'],
-            enable_fmt: [Fields.ENABLEFORMAT,  'boolean'],
-            icon_name:  [Fields.SYSTRAYICON,   'string'],
-            menu_size:  [Fields.MENUSIZE,      'uint'],
+    _bindSettings(fulu) {
+        this._fulu = fulu.attach({
+            format:     [Field.FORMAT,        'uint'],
+            enable_fmt: [Field.ENABLEFORMAT,  'boolean'],
+            icon_name:  [Field.SYSTRAYICON,   'string'],
+            menu_size:  [Field.MENUSIZE,      'uint'],
         }, this).attach({
-            collect:    [Fields.COLORSCOLLECT, 'string', x => x.split('|').filter(Boolean)],
-            history:    [Fields.COLORSHISTORY, 'string', x => x.split('|').filter(Boolean)],
-            menu_style: [Fields.MENUSTYLE,     'boolean'],
+            collect:    [Field.COLORSCOLLECT, 'string', x => x.split('|').filter(y => y)],
+            history:    [Field.COLORSHISTORY, 'string', x => x.split('|').filter(y => y)],
+            menu_style: [Field.MENUSTYLE,     'boolean'],
         }, this, 'section');
     }
 
@@ -680,43 +669,47 @@ class ColorButton extends PanelMenu.Button {
         }
         return super.vfunc_event(event);
     }
-
-    destroy() {
-        this._field.detach(this);
-        super.destroy();
-    }
 }
 
-class ColorPicker {
+class ColorPicker extends DEventEmitter {
     constructor() {
-        this._field = new Field({}, ExtensionUtils.getSettings(), this);
-        this._field.attach({
-            format:        [Fields.FORMAT,         'uint'],
-            enable_fmt:    [Fields.ENABLEFORMAT,   'boolean'],
-            history:       [Fields.COLORSHISTORY,  'string'],
-            systray:       [Fields.ENABLESYSTRAY,  'boolean'],
-            auto_copy:     [Fields.AUTOCOPY,       'boolean'],
-            shortcut:      [Fields.ENABLESHORTCUT, 'boolean'],
-            menu_size:     [Fields.MENUSIZE,       'uint'],
-            notify_style:  [Fields.NOTIFYSTYLE,    'uint'],
-            enable_notify: [Fields.ENABLENOTIFY,   'boolean'],
+        super();
+        this._buildWidgets();
+        this._bindSettings();
+    }
+
+    _buildWidgets() {
+        this._fulu = new Fulu({}, ExtensionUtils.getSettings(), this);
+        this._sbt_s = new Symbiont(x => x && Main.wm.removeKeybinding(Field.PICKSHORTCUT), this,
+            x => x && Main.wm.addKeybinding(Field.PICKSHORTCUT, this._fulu.gset, Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, () => this.summon()));
+        new Symbiont(() => { this.dispel(); this.systray = null; }, this);
+    }
+
+    _bindSettings() {
+        this._fulu.attach({
+            format:        [Field.FORMAT,         'uint'],
+            enable_fmt:    [Field.ENABLEFORMAT,   'boolean'],
+            history:       [Field.COLORSHISTORY,  'string'],
+            systray:       [Field.ENABLESYSTRAY,  'boolean'],
+            auto_copy:     [Field.AUTOCOPY,       'boolean'],
+            shortcut:      [Field.ENABLESHORTCUT, 'boolean'],
+            menu_size:     [Field.MENUSIZE,       'uint'],
+            notify_style:  [Field.NOTIFYSTYLE,    'uint'],
+            enable_notify: [Field.ENABLENOTIFY,   'boolean'],
         }, this);
     }
 
     set shortcut(shortcut) {
-        this._shortId && Main.wm.removeKeybinding(Fields.PICKSHORTCUT);
-        this._shortId = shortcut && Main.wm.addKeybinding(Fields.PICKSHORTCUT, this._field.gset,
-            Meta.KeyBindingFlags.NONE, Shell.ActionMode.ALL, () => this.summon());
+        this._sbt_s.reset(shortcut);
     }
 
     set systray(systray) {
+        if(xnor(systray, this._button)) return;
         if(systray) {
-            if(this._button) return;
-            this._button = new ColorButton(this._field, 0.5, Me.metadata.uuid);
+            this._button = new ColorButton(this._fulu, 0.5, Me.metadata.uuid);
             this._button.connect('left-click', () => this.summon());
             Main.panel.addToStatusArea(Me.metadata.uuid, this._button);
         } else {
-            if(!this._button) return;
             this._button.destroy();
             this._button = null;
         }
@@ -725,7 +718,7 @@ class ColorPicker {
     summon() {
         if(this._area) return;
         if(this._button) this._button.add_style_pseudo_class('busy');
-        this._area = this.enable_fmt ? new ColorArea({ format: this.format, field: this._field }) : new ColorArea({ field: this._field });
+        this._area = new ColorArea({ format: this.enable_fmt ? this.format : null, fulu: this._fulu });
         this._area.connectObject('end-pick', () => this.dispel(), 'notify-color', this.inform.bind(this), this);
         Main.layoutManager.addChrome(this._area);
         this._grab = Main.pushModal(this._area, { actionMode: Shell.ActionMode.NORMAL });
@@ -762,7 +755,7 @@ class ColorPicker {
     }
 
     _addHistory(color) {
-        let history = [color, ...this.history.split('|').filter(Boolean)];
+        let history = [color, ...this.history.split('|').filter(x => x)];
         while(history.length > this.menu_size) history.pop();
         this.setf('history', history.join('|'));
     }
@@ -770,10 +763,10 @@ class ColorPicker {
     pickAsync() {
         return new Promise((resolve, reject) => {
             try {
-                if(this._area) throw new Error('Cannot start picking');
+                if(this._area) throw new Gio.IOErrorEnum({ code: Gio.IOErrorEnum.FAILED, message: 'Cannot start picking' });
                 if(this._button) this._button.add_style_pseudo_class('busy');
-                this._area = new ColorArea({ once: true, field: this._field });
-                this._area.connect('end-pick', () => { this.dispel(); throw new Error('Cancelled'); });
+                this._area = new ColorArea({ once: true, fulu: this._fulu });
+                this._area.connect('end-pick', () => { this.dispel(); throw new Gio.IOErrorEnum({ code: Gio.IOErrorEnum.CANCELLED, message: 'Cancelled' }); });
                 this._area.connect('notify-color', (_a, color) => resolve(color.toText(Format.HEX)));
                 Main.pushModal(this._area, { actionMode: Shell.ActionMode.NORMAL });
                 Main.layoutManager.addTopChrome(this._area);
@@ -782,34 +775,13 @@ class ColorPicker {
             }
         });
     }
-
-    destroy() {
-        this._field.detach(this);
-        this.dispel();
-        this.systray = this.shortcut = null;
-    }
 }
 
-class Extension {
-    constructor() {
-        ExtensionUtils.initTranslations();
-    }
-
+class Extension extends Ext {
     // API: Main.extensionManager.lookup('color-picker@tuberry').stateObj.pickAsync().then(log).catch(log)
-    pickAsync() {
-        return this._ext.pickAsync();
-    }
-
-    enable() {
-        this._ext = new ColorPicker();
-    }
-
-    disable() {
-        this._ext.destroy();
-        this._ext = null;
-    }
+    pickAsync = () => this._delegate.pickAsync();
 }
 
 function init() {
-    return new Extension();
+    return new Extension(ColorPicker);
 }
