@@ -50,7 +50,7 @@ To use these Gnome Shell configurations and extensions, follow these steps:
 
 1. Load the Gnome Shell settings and extensions:
 
-   - Run the `settings-loader.sh` script to load the Gnome Shell settings and extensions configurations.
+   - Run the `settings-manager.sh` script to load and save the Gnome Shell settings and extensions configurations.
    - Alternatively, manually copy the contents of the `gnome-settings.ini` and `extensions-settings.ini` files to their respective locations in your Gnome Shell configuration directory.
 
 1. Customize the Gnome Shell configurations according to your preferences. Feel free to modify or add extensions, update settings, or change the applied theme.
