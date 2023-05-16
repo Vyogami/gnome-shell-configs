@@ -28,6 +28,7 @@ The following Gnome Shell extensions are stored in this repository:
 - **supergfxctl-gex @asus-linux.org**: Adds advanced graphics settings and control for ASUS laptops.
 - **top-bar-organizer @julian.gse.jsts.xyz**: Allows customization and organization of items in the top bar.
 - **unite @hardpixel.eu**: Combines the title bar and top bar to save vertical screen space.
+- **hanabi-extension @jeffshee**: Live wallpaper for gnome
 
 These extensions provide additional functionality, customization options, and convenience features to enhance your Gnome Shell experience.
 
