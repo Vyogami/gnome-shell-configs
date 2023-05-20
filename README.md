@@ -18,9 +18,9 @@ The following Gnome Shell extensions are stored in this repository:
 - **gtktitlebar @velitasali**: Removes the title bar from maximized windows, saving screen space.
 - **just-perfection-desktop @just-perfection**: Customizes the desktop layout, including the taskbar, app menu, and system tray.
 - **netspeed @alynx.one**: Displays network speed indicators in the top bar.
-  > not upgraded for gnome 44
+  > **Warning**: Incompatible with Gnome 44
 - **netspeed simplified @prateekmedia**: Displays network speed indicators in the top bar.
-  > used in gnome 44
+  > **Note**: Compatible with Gnome 44
 - **openweather-extension @jenslody**: Provides weather information in the top bar, including current conditions and forecasts.
 - **quick-settings-tweaks @qwreey**: Adds additional settings and tweaks to the Gnome Shell top bar.
 - **reorder-workspaces @jer**: Allows reordering of workspaces in the Activities Overview.
