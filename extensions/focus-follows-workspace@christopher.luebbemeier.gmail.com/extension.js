@@ -9,6 +9,7 @@ const WindowManager = imports.ui.windowManager;
 const WorkspaceAnimation = imports.ui.workspaceAnimation;
 const Mainloop = imports.mainloop;
 const Meta = imports.gi.Meta;
+const GLib = imports.gi.GLib;
 
 class Extension {
     constructor() {
@@ -19,6 +20,14 @@ class Extension {
         this._overrideActionMoveWorkspace();
         this._overrideHandleWorkspaceScroll();
         this._overrideActivate();
+        this._settings = ExtensionUtils.getSettings(
+            'org.gnome.shell.extensions.focus-follows-workspace',
+        );
+        this._moveCursor = this._settings.get_boolean('move-cursor');
+        this._moveCursorChanged = this._settings.connect(
+            `changed::move-cursor`,
+            () => (this._moveCursor = this._settings.get_boolean('move-cursor')),
+        );
     }
 
     disable() {
@@ -27,6 +36,9 @@ class Extension {
         WindowManager.WindowManager.prototype.handleWorkspaceScroll =
             this._handleWorkspaceScrollOriginal;
         Meta.Workspace.prototype.activate = this._activateOriginal;
+        this._settings.disconnect(this._moveCursorChanged);
+        this._settings = null;
+        this._clearTimeout();
     }
 
     _overrideActionMoveWorkspace() {
@@ -37,9 +49,10 @@ class Extension {
         const self = this;
         WindowManager.WindowManager.prototype.actionMoveWorkspace = function (workspace) {
             self._actionMoveWorkspaceOriginal.apply(this, arguments);
-            if (!self._wasScrollEvent) {
-                self._focusPrimaryMonitor();
-            }
+            // Moving the cursor when the workspace switch was triggered by a scroll event is
+            // confusing, so we rather fail to focus a window on the activated workspace than moving
+            // the cursor.
+            self._focusPrimaryMonitor({ moveCursor: !self._wasScrollEvent });
             self._wasScrollEvent = false; // reset
         };
     }
@@ -88,15 +101,16 @@ class Extension {
     }
 
     /** Focus the most recently focused window of the current workspace on the primary monitor. */
-    _focusPrimaryMonitor() {
-        // `AltTab.getWindows` might return windows of the current monitor only. We move the pointer
-        // to the primary monitor to make it the current one.
-        this._movePointerToPrimaryMonitor();
-        // Wait a tick for the current monitor to be updated reliably.
-        Mainloop.timeout_add(0, () => {
-            const activeWs = global.workspaceManager.get_active_workspace();
-            this._focusPrimaryMonitorWhenHasPointer(activeWs);
-        });
+    async _focusPrimaryMonitor({ moveCursor = true } = {}) {
+        if (moveCursor && this._moveCursor) {
+            // `AltTab.getWindows` might return windows of the current monitor only. We move the pointer
+            // to the primary monitor to make it the current one.
+            this._movePointerToPrimaryMonitor();
+            // Wait a tick for the current monitor to be updated reliably.
+            await this._tick();
+        }
+        const activeWs = global.workspaceManager.get_active_workspace();
+        this._focusPrimaryMonitorWhenHasPointer(activeWs);
     }
 
     /**
@@ -123,6 +137,23 @@ class Extension {
             const seat = Clutter.get_default_backend().get_default_seat();
             const rect = global.display.get_monitor_geometry(Main.layoutManager.primaryIndex);
             seat.warp_pointer(rect.x + rect.width / 2, rect.y + rect.height / 2);
+        }
+    }
+
+    _tick() {
+        return new Promise((resolve) => {
+            this._clearTimeout();
+            this._timeoutId = Mainloop.timeout_add(0, () => {
+                this._timeoutId = null;
+                resolve();
+            });
+        });
+    }
+
+    _clearTimeout() {
+        if (this._timeoutId) {
+            GLib.Source.remove(this._timeoutId);
+            this._timeoutId = null;
         }
     }
 }
