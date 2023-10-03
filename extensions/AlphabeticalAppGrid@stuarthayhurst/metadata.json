@@ -3,6 +3,7 @@
   "debug": false,
   "description": "Restore the alphabetical ordering of the app grid",
   "donations": {
+    "github": "stuarthayhurst",
     "paypal": "stuartahayhurst"
   },
   "gettext-domain": "AlphabeticalAppGrid@stuarthayhurst",
@@ -18,5 +19,5 @@
   ],
   "url": "https://github.com/stuarthayhurst/alphabetical-grid-extension",
   "uuid": "AlphabeticalAppGrid@stuarthayhurst",
-  "version": 31
+  "version": 32
 }
