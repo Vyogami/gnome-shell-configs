@@ -1,5 +1,21 @@
 ## Changelog:
 
+### v35: - `2023-09-17`
+ - Updated Italian translation (#84)
+
+### v34: - `2023-08-22`
+ - Added a new interface, using `libadwaita`
+ - Disabled fuzzy translations
+ - Stopped exporting generic class names
+ - Updated README and documentation
+ - Updated Spanish translation (#83)
+
+### v33: - `2023-08-19`
+ - Support GNOME 45
+   - **Support for earlier versions has been removed**
+ - General code improvements
+ - Build system improvements
+
 ### v32: - `2023-08-16`
 **This release will be the final release to support pre-45 versions of GNOME**
  - Updated Taiwanese translations (#81)

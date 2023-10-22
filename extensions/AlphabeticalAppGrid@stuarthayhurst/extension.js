@@ -1,104 +1,104 @@
-/* exported init enable disable */
+/* exported AppGridManager */
 
-//Local extension imports
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
-const { AppGridHelper, ExtensionHelper } = Me.imports.lib;
-const ShellVersion = ExtensionHelper.shellVersion;
+//Local imports
+import * as AppGridHelper from './lib/AppGridHelper.js';
 
 //Main imports
-const { GLib, Gio, Shell } = imports.gi;
-const Main = imports.ui.main;
+import GLib from 'gi://GLib';
+import Gio from 'gi://Gio';
+import Shell from 'gi://Shell';
+
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as OverviewControls from 'resource:///org/gnome/shell/ui/overviewControls.js';
+
+//Extension system imports
+import {Extension, InjectionManager} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 //Access required objects and systems
 const AppDisplay = AppGridHelper.AppDisplay;
 const Controls = Main.overview._overview._controls;
-const OverviewControls = imports.ui.overviewControls;
 
-function init() {
-  ExtensionUtils.initTranslations();
+export default class AppGridManager extends Extension {
+  enable() {
+    let extensionSettings = this.getSettings();
+    this._gridReorder = new AppGridExtension(extensionSettings);
+
+    //Patch shell, reorder and trigger listeners
+    AppDisplay._redisplay();
+    this._gridReorder.patchShell();
+    this._gridReorder.startListeners();
+    this._gridReorder.reorderGrid('Reordering app grid');
+  }
+
+   disable() {
+    //Disconnect from events and clean up
+    this._gridReorder.disconnectListeners();
+    this._gridReorder.unpatchShell();
+
+    this._gridReorder = null;
+  }
 }
 
-function enable() {
-  gridReorder = new Extension();
-  ExtensionHelper.loggingEnabled = Me.metadata.debug || gridReorder.extensionSettings.get_boolean('logging-enabled');
+class AppGridExtension {
+  constructor(extensionSettings) {
+    this._injectionManager = new InjectionManager();
 
-  //Patch shell, reorder and trigger listeners
-  AppDisplay._redisplay();
-  gridReorder.patchShell();
-  gridReorder.startListeners();
-  gridReorder.reorderGrid('Reordering app grid');
-}
+    this._extensionSettings = extensionSettings;
+    this._shellSettings = new Gio.Settings({schema: 'org.gnome.shell'});
+    this._folderSettings = new Gio.Settings({schema: 'org.gnome.desktop.app-folders'});
 
-function disable() {
-  //Disconnect from events and clean up
-  gridReorder.disconnectListeners();
-  gridReorder.unpatchShell();
-
-  gridReorder = null;
-}
-
-class Extension {
-  constructor() {
-    //Load gsettings values for GNOME Shell
-    this.shellSettings = new Gio.Settings( {schema: 'org.gnome.shell'} );
-    //Load gsettings values for folders, to access 'folder-children'
-    this.folderSettings = new Gio.Settings( {schema: 'org.gnome.desktop.app-folders'} );
-    //Load gsettings values for the extension itself
-    this.extensionSettings = ExtensionUtils.getSettings();
-    //Save original shell functions
-    this._originalCompareItems = AppDisplay._compareItems;
-    this._originalRedisplay = AppDisplay._redisplay;
-    //Create a lock to prevent code triggering multiple reorders at once
+    this._loggingEnabled = this._extensionSettings.get_boolean('logging-enabled');
     this._currentlyUpdating = false;
   }
 
-  patchShell() {
-    //Patched functions declared here for access to extension's variables
-
-    //Patched version of _redisplay() to apply custom order
-    function _patchedRedisplay() {
-      //Call patched redisplay code to reorder the items
-      AppGridHelper.reloadAppGrid.call(AppDisplay);
+  _logMessage(message) {
+    if (this._loggingEnabled) {
+      let date = new Date();
+      let timestamp = date.toTimeString().split(' ')[0];
+      log('alphabetical-app-grid [' + timestamp + ']: ' + message);
     }
+  }
 
+  patchShell() {
     //Patched version of _compareItems(), to apply custom order
-    let extensionSettings = this.extensionSettings;
-    let folderSettings = this.folderSettings;
+    let extensionSettings = this._extensionSettings;
+    let folderSettings = this._folderSettings;
     function _patchedCompareItems(a, b) {
       let folderPosition = extensionSettings.get_string('folder-order-position');
       let folderArray = folderSettings.get_value('folder-children').get_strv();
-      return AppGridHelper.compareItems(a, b, folderPosition, folderArray);
+      return AppGridHelper.compareItems.call(this, a, b, folderPosition, folderArray);
     }
 
     //Patch the internal functions
-    AppDisplay._compareItems = _patchedCompareItems;
-    ExtensionHelper.logMessage('Patched item comparison');
+    this._injectionManager.overrideMethod(AppDisplay, '_compareItems', () => {
+      return _patchedCompareItems.bind(AppDisplay);
+    });
+    this._logMessage('Patched item comparison');
 
-    AppDisplay._redisplay = _patchedRedisplay;
-    ExtensionHelper.logMessage('Patched redisplay');
+    this._injectionManager.overrideMethod(AppDisplay, '_redisplay', () => {
+      return AppGridHelper.reloadAppGrid.bind(AppDisplay);
+    });
+    this._logMessage('Patched redisplay');
   }
 
   unpatchShell() {
     //Unpatch the internal functions for extension shutdown
-    AppDisplay._compareItems = this._originalCompareItems;
-    ExtensionHelper.logMessage('Unpatched item comparison');
-
-    AppDisplay._redisplay = this._originalRedisplay;
-    ExtensionHelper.logMessage('Unpatched redisplay');
+    this._injectionManager.clear();
+    this._logMessage('Unpatched item comparison');
+    this._logMessage('Unpatched redisplay');
   }
 
   //Helper functions
 
-  reorderGrid(logMessage) {
+  reorderGrid(logText) {
     //Detect lock to avoid multiple changes at once
     if (!this._currentlyUpdating && !AppDisplay._pageManager._updatingPages) {
       this._currentlyUpdating = true;
-      ExtensionHelper.logMessage(logMessage);
+      this._logMessage(logText);
 
       //Alphabetically order the contents of each folder, if enabled
-      if (this.extensionSettings.get_boolean('sort-folder-contents')) {
-        ExtensionHelper.logMessage('Reordering folder contents');
+      if (this._extensionSettings.get_boolean('sort-folder-contents')) {
+        this._logMessage('Reordering folder contents');
         AppGridHelper.reorderFolderContents();
       }
 
@@ -126,16 +126,16 @@ class Extension {
     //One time connections
     this._reorderOnDisplay();
 
-    ExtensionHelper.logMessage('Connected to listeners');
+    this._logMessage('Connected to listeners');
   }
 
   disconnectListeners() {
-    this.shellSettings.disconnect(this._reorderSignal);
+    this._shellSettings.disconnect(this._reorderSignal);
     Main.overview.disconnect(this._dragReorderSignal);
-    this.shellSettings.disconnect(this._favouriteAppsSignal);
-    this.extensionSettings.disconnect(this._settingsChangedSignal);
+    this._shellSettings.disconnect(this._favouriteAppsSignal);
+    this._extensionSettings.disconnect(this._settingsChangedSignal);
     Shell.AppSystem.get_default().disconnect(this._installedAppsChangedSignal);
-    this.folderSettings.disconnect(this._foldersChangedSignal);
+    this._folderSettings.disconnect(this._foldersChangedSignal);
 
     if (this._reorderOnDisplaySignal != null) {
       Controls._stateAdjustment.disconnect(this._reorderOnDisplaySignal);
@@ -146,12 +146,12 @@ class Extension {
       GLib.Source.remove(this._reorderGridTimeoutId);
     }
 
-    ExtensionHelper.logMessage('Disconnected from listeners');
+    this._logMessage('Disconnected from listeners');
   }
 
   _waitForGridReorder() {
     //Connect to gsettings and wait for the order to change
-    this._reorderSignal = this.shellSettings.connect('changed::app-picker-layout', () => {
+    this._reorderSignal = this._shellSettings.connect('changed::app-picker-layout', () => {
       this.reorderGrid('App grid layout changed, triggering reorder');
     });
 
@@ -162,12 +162,6 @@ class Extension {
   }
 
   _reorderOnDisplay() {
-    //Ignore this signal on GNOME 3.38
-    if (ShellVersion < 40) {
-      this._reorderOnDisplaySignal = null;
-      return;
-    }
-
     //Reorder when the app grid is opened
     this._reorderOnDisplaySignal = Controls._stateAdjustment.connect('notify::value', () => {
       if (Controls._stateAdjustment.value == OverviewControls.ControlsState.APP_GRID) {
@@ -178,22 +172,22 @@ class Extension {
 
   _waitForFavouritesChange() {
     //Connect to gsettings and wait for the favourite apps to change
-    this._favouriteAppsSignal = this.shellSettings.connect('changed::favorite-apps', () => {
+    this._favouriteAppsSignal = this._shellSettings.connect('changed::favorite-apps', () => {
       this.reorderGrid('Favourite apps changed, triggering reorder');
     });
   }
 
   _waitForSettingsChange() {
     //Connect to gsettings and wait for the extension's settings to change
-    this._settingsChangedSignal = this.extensionSettings.connect('changed', () => {
-      ExtensionHelper.loggingEnabled = Me.metadata.debug || this.extensionSettings.get_boolean('logging-enabled');
+    this._settingsChangedSignal = this._extensionSettings.connect('changed', () => {
+      this._loggingEnabled = this._extensionSettings.get_boolean('logging-enabled');
       this.reorderGrid('Extension gsettings values changed, triggering reorder');
     });
   }
 
   _waitForFolderChange() {
     //If a folder was made or deleted, trigger a reorder
-    this._foldersChangedSignal = this.folderSettings.connect('changed::folder-children', () => {
+    this._foldersChangedSignal = this._folderSettings.connect('changed::folder-children', () => {
       this.reorderGrid('Folders changed, triggering reorder');
     });
   }

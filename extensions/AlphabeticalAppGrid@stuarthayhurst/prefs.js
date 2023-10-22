@@ -1,246 +1,160 @@
-/* exported init fillPreferencesWindow buildPrefsWidget */
-
-//Local extension imports
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
-const { ExtensionHelper } = Me.imports.lib;
-const ShellVersion = ExtensionHelper.shellVersion;
+/* exported AppGridPrefs */
 
 //Main imports
-const { Gtk, Gio, GLib } = imports.gi;
-const Adw = ShellVersion >= 42 ? imports.gi.Adw : null;
+import Gio from 'gi://Gio';
+import Gtk from 'gi://Gtk';
+import Adw from 'gi://Adw';
+import GObject from 'gi://GObject';
 
-//Use _() for translations
-const _ = imports.gettext.domain(Me.metadata.uuid).gettext;
+//Extension system imports
+import {ExtensionPreferences, gettext as _} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-var PrefsPages = class PrefsPages {
-  constructor() {
-    this._settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.alphabetical-app-grid');
-
-    this._builder = new Gtk.Builder();
-    this._builder.set_translation_domain(Me.metadata.uuid);
-
-    this.createPreferences();
-    this.createAbout();
-    this.createCredits();
-  }
-
-  _getCredits(creditDataRaw, creditType) {
-    let creditsData = JSON.parse(creditDataRaw);
-    let creditStrings = [];
-    creditsData[creditType].forEach((creditUser) => {
-      //Build the credit string for each individual
-      let string = creditUser['name'];
-
-      //If given, use the email as a clickable link
-      if (creditUser['contact'] != '') {
-        string = '<a href="mailto::' + creditUser['contact'] + '">' + string + '</a>'
-      }
-
-      //Use the year if given
-      if (creditUser['year'] != '' && creditUser['year'] != undefined) {
-        string = string + ' ' + creditUser['year'];
-      }
-
-      creditStrings.push(string);
+var PrefsPage = GObject.registerClass(
+class PrefsPage extends Adw.PreferencesPage {
+  _init(pageInfo, groupsInfo, settingsInfo, settings) {
+    super._init({
+      title: pageInfo[0],
+      icon_name: pageInfo[1]
     });
 
-    return creditStrings;
+    this._extensionSettings = settings;
+    this._settingGroups = {};
+
+    //Setup settings
+    this._createGroups(groupsInfo);
+    this._createSettings(settingsInfo);
   }
 
-  createPreferences() {
-    //Use different UI file for GNOME 40+ and 3.38
-    if (ShellVersion >= 40) {
-      this._builder.add_from_file(Me.path + '/ui/gtk4/prefs.ui');
-    } else {
-      this._builder.add_from_file(Me.path + '/ui/gtk3/prefs.ui');
-    }
-
-    //Get the settings container widget
-    this.preferencesWidget = this._builder.get_object('main-prefs');
-
-    this.settingElements = {
-      'sort-folders-switch': {
-        'settingKey': 'sort-folder-contents',
-        'bindProperty': 'active'
-      },
-      'folder-order-dropdown': {
-        'settingKey': 'folder-order-position',
-        'bindProperty': 'active-id'
-      },
-      'logging-enabled-switch': {
-        'settingKey': 'logging-enabled',
-        'bindProperty': 'active'
-      }
-    }
-
-    //Loop through settings toggles and dropdowns and bind together
-    Object.keys(this.settingElements).forEach((element) => {
-      this._settings.bind(
-        this.settingElements[element].settingKey, //GSettings key to bind to
-        this._builder.get_object(element), //GTK UI element to bind to
-        this.settingElements[element].bindProperty, //The property to share
-        Gio.SettingsBindFlags.DEFAULT
-      );
+  _createGroups(groupsInfo) {
+    //Store groups, set title and add to window
+    groupsInfo.forEach((groupInfo) => {
+      this._settingGroups[groupInfo[0]] = new Adw.PreferencesGroup();
+      this._settingGroups[groupInfo[0]].set_title(groupInfo[1]);
+      this.add(this._settingGroups[groupInfo[0]]);
     });
   }
 
-  createAbout() {
-    //Use different UI file for GNOME 40+ and 3.38
-    if (ShellVersion >= 40) {
-      this._builder.add_from_file(Me.path + '/ui/gtk4/about.ui');
-    } else {
-      this._builder.add_from_file(Me.path + '/ui/gtk3/about.ui');
-    }
-
-    //Get the about page and fill in values
-    this.aboutWidget = this._builder.get_object('about-page');
-    this._builder.get_object('extension-version').set_label('v' + Me.metadata.version.toString());
-    this._builder.get_object('extension-icon').set_from_file(Me.path + '/icon.svg');
-  }
-
-  createCredits() {
-    //Use different UI file for GNOME 40+ and 3.38
-    if (ShellVersion >= 40) {
-      this._builder.add_from_file(Me.path + '/ui/gtk4/credits.ui');
-    } else {
-      this._builder.add_from_file(Me.path + '/ui/gtk3/credits.ui');
-    }
-
-    //Set the icon
-    this._builder.get_object('extension-credits-icon').set_from_file(Me.path + '/icon.svg');
-
-    //Get the credits page and grid
-    this.creditsWidget = this._builder.get_object('credits-page');
-    let creditsGrid = this._builder.get_object('credits-grid');
-
-    //Read in the saved extension credits
-    let [success, data] = GLib.file_get_contents(Me.path + '/credits.json');
-    if (!success) {
-      return;
-    }
-
-    //On GNOME 41+ use a TextDecoder to decode the file's contents
-    if (ShellVersion >= 41) {
-      data = new TextDecoder().decode(data);
-    }
-
-    //Parse the credits
-    let developerStrings = this._getCredits(data, 'developers');
-    let translatorStrings = this._getCredits(data, 'translators');
-
-    //Set the target number of rows to the required amount
-    let developerCount = developerStrings.length;
-    let translatorCount = translatorStrings.length;
-    let rowCount = developerCount > translatorCount ? developerCount : translatorCount;
-
-    //Add the credit and a separator for each row
-    for (let i = 0; i < rowCount; i++) {
-      let baseRow = i * 2
-      //Append a row for credits
-      creditsGrid.insert_row(baseRow + 2);
-
-      //If there are developers left to append, do it
-      if (developerCount > i) {
-        let developerLabel = new Gtk.Label();
-        developerLabel.set_markup(developerStrings[i]);
-        creditsGrid.attach(developerLabel, 0, baseRow + 2, 1, 1);
+  _createSettings(settingsInfo) {
+    settingsInfo.forEach(settingInfo => {
+      //Check the target group exists
+      if (!(settingInfo[0] in this._settingGroups)) {
+        return;
       }
 
-      //If there are translators left to append, do it
-      if (translatorCount > i) {
-        let translatorLabel = new Gtk.Label();
-        translatorLabel.set_markup(translatorStrings[i]);
-        creditsGrid.attach(translatorLabel, 1, baseRow + 2, 1, 1);
+      //Handle type-specific setup
+      let settingRow = null;
+      if (settingInfo[4] === null) {
+        //Create a row with a switch, title and subtitle
+        settingRow = new Adw.SwitchRow({
+          title: settingInfo[2],
+          subtitle: settingInfo[3]
+        });
+
+        //Connect the row's element to the setting
+        this._extensionSettings.bind(
+          settingInfo[1], //GSettings key to bind to
+          settingRow, //Object to bind to
+          'active', //The property to share
+          Gio.SettingsBindFlags.DEFAULT
+        );
+
+      } else {
+        //Store the options for the setting
+        let stringList = new Gtk.StringList();
+        settingInfo[4].forEach((entry) => {
+          stringList.append(entry[1]);
+        });
+
+        //Create a row with a combo box, title and subtitle
+        settingRow = new Adw.ComboRow({
+          title: settingInfo[2],
+          subtitle: settingInfo[3],
+          model: stringList
+        });
+        settingRow._dropdownData = [...settingInfo[4]];
+        settingRow._settingKey = settingInfo[1];
+
+        settingRow.connect('notify::selected-item', (row) => {
+          let index = row.get_selected();
+          let value = row._dropdownData[index][0];
+          this._extensionSettings.set_string(row._settingKey, value);
+        });
       }
 
-      //Add a separator
-      creditsGrid.insert_row(baseRow + 3);
-      creditsGrid.attach(new Gtk.Separator(), 0, baseRow + 3, 2, 1);
-    }
-  }
-}
-
-function init() {
-  ExtensionUtils.initTranslations();
-}
-
-//Create preferences window for GNOME 42+
-function fillPreferencesWindow(window) {
-  //Create pages and widgets
-  let prefsPages = new PrefsPages();
-  let settingsPage = new Adw.PreferencesPage();
-  let settingsGroup = new Adw.PreferencesGroup();
-  let aboutPage = new Adw.PreferencesPage();
-  let aboutGroup = new Adw.PreferencesGroup();
-  let creditsPage = new Adw.PreferencesPage();
-  let creditsGroup = new Adw.PreferencesGroup();
-
-  //Build the settings page
-  settingsPage.set_title(_('Settings'));
-  settingsPage.set_icon_name('preferences-system-symbolic');
-  settingsGroup.add(prefsPages.preferencesWidget);
-  settingsPage.add(settingsGroup);
-
-  //Build the about page
-  aboutPage.set_title(_('About'));
-  aboutPage.set_icon_name('help-about-symbolic');
-  aboutGroup.add(prefsPages.aboutWidget);
-  aboutPage.add(aboutGroup);
-
-  //Build the about page
-  creditsPage.set_title(_('Credits'));
-  creditsPage.set_icon_name('system-users-symbolic');
-  creditsGroup.add(prefsPages.creditsWidget);
-  creditsPage.add(creditsGroup);
-
-  //Add the pages to the window
-  window.add(settingsPage);
-  window.add(aboutPage);
-  window.add(creditsPage);
-}
-
-//Create preferences window for GNOME 3.38-41
-function buildPrefsWidget() {
-  let prefsPages = new PrefsPages();
-  let settingsWindow = new Gtk.ScrolledWindow();
-
-  //Use a stack to store pages
-  let pageStack = new Gtk.Stack();
-  pageStack.add_titled(prefsPages.preferencesWidget, 'settings', _('Settings'));
-  pageStack.add_titled(prefsPages.aboutWidget, 'about', _('About'));
-  pageStack.add_titled(prefsPages.creditsWidget, 'credits', _('Credits'));
-
-  let pageSwitcher = new Gtk.StackSwitcher();
-  pageSwitcher.set_stack(pageStack);
-
-  //Add the stack to the scrolled window
-  if (ShellVersion >= 40) {
-    settingsWindow.set_child(pageStack);
-  } else {
-    settingsWindow.add(pageStack);
+      //Add the row to the group
+      this._settingGroups[settingInfo[0]].add(settingRow);
+    });
   }
 
-  //Enable all elements differently for GNOME 40+ and 3.38
-  if (ShellVersion >= 40) {
-    settingsWindow.show();
-  } else {
-    settingsWindow.show_all();
+  addLinks(window, linksInfo, groupName) {
+    //Setup and add links group to window
+    let linksGroup = new Adw.PreferencesGroup();
+    linksGroup.set_title(groupName);
+    this.add(linksGroup);
+
+    linksInfo.forEach((linkInfo) => {
+      //Create a row for the link widget
+      let linkEntryRow = new Adw.ActionRow({
+        title: linkInfo[0],
+        subtitle: linkInfo[1],
+        activatable: true
+      });
+
+      //Open the link when clicked
+      linkEntryRow.connect('activated', () => {
+        let uriLauncher = new Gtk.UriLauncher();
+        uriLauncher.set_uri(linkInfo[2]);
+        uriLauncher.launch(window, null, null);
+      });
+
+      linksGroup.add(linkEntryRow);
+    });
   }
+});
 
-  //Modify top bar to add a page menu, when the window is ready
-  settingsWindow.connect('realize', () => {
-    let window = ShellVersion >= 40 ? settingsWindow.get_root() : settingsWindow.get_toplevel();
-    let headerBar = window.get_titlebar();
+export default class AppGridPrefs extends ExtensionPreferences {
+  //Create preferences window with libadwaita
+  fillPreferencesWindow(window) {
+    //Translated title, icon name
+    let pageInfo = [_('Settings'), 'preferences-system-symbolic'];
 
-    //Add page switching menu to header
-    if (ShellVersion >= 40) {
-      headerBar.set_title_widget(pageSwitcher);
-    } else {
-      headerBar.set_custom_title(pageSwitcher);
-    }
-    pageSwitcher.show();
-  });
+    let groupsInfo = [
+      //Group ID, translated title
+      ['general', _('General settings')],
+      ['developer', _('Developer settings')]
+    ];
 
-  return settingsWindow;
+    let dropdownOptions = [
+      //Setting value, translated label
+      //Translators: 'Alphabetical' means 'Place folders alphabetically, among other items'
+      ['alphabetical', _('Alphabetical')],
+      //Translators: 'Start' means 'Place folders at the start'
+      ['start', _('Start')],
+      //Translators: 'End' means 'Place folders at the end'
+      ['end', _('End')]
+    ];
+
+    let settingsInfo = [
+      //Group ID, setting key, title, subtitle, extra data
+      ['general', 'sort-folder-contents', _('Sort folder contents'), _('Whether the contents of folders should be sorted alphabetically'), null],
+      ['general', 'folder-order-position',  _('Position of ordered folders'), _('Where to place folders when ordering the applications grid'), dropdownOptions],
+      ['developer', 'logging-enabled',  _('Enable extension logging'), _('Allow the extension to send messages to the system logs'), null]
+    ];
+
+    //Create settings page from info
+    let settingsPage = new PrefsPage(pageInfo, groupsInfo, settingsInfo, this.getSettings());
+
+    //Define and add links
+    let linksInfo = [
+      //Translated title, link
+      [_('Report an issue'), _('GitHub issue tracker'), 'https://github.com/stuarthayhurst/alphabetical-grid-extension/issues'],
+      [_('Donate via GitHub'), _('Become a sponsor'), 'https://github.com/sponsors/stuarthayhurst'],
+      [_('Donate via PayPal'), _('Thanks for your support :)'), 'https://www.paypal.me/stuartahayhurst']
+    ];
+    settingsPage.addLinks(window, linksInfo, _("Links"));
+
+    //Add the pages to the window, enable searching
+    window.add(settingsPage);
+    window.set_search_enabled(true);
+  }
 }

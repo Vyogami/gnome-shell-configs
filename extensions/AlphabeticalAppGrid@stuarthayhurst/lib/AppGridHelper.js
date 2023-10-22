@@ -1,22 +1,29 @@
 /* exported AppDisplay reorderFolderContents compareItems reloadAppGrid */
 
-//Local extension imports
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
-const { ExtensionHelper } = Me.imports.lib;
-const ShellVersion = ExtensionHelper.shellVersion;
-
 //Main imports
-const { GLib, Gio, Shell } = imports.gi;
-const Main = imports.ui.main;
+import GLib from 'gi://GLib';
+import Gio from 'gi://Gio';
+import Shell from 'gi://Shell';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 //Get access to the AppDisplay, also used by extension.js
-var AppDisplay = ShellVersion >= 40 ? Main.overview._overview._controls._appDisplay : Main.overview.viewSelector.appDisplay;
+export var AppDisplay = Main.overview._overview._controls._appDisplay;
 
-let folderSettings = new Gio.Settings( {schema: 'org.gnome.desktop.app-folders'} );
+let folderSettings = new Gio.Settings({schema: 'org.gnome.desktop.app-folders'});
+
+//Helpers to provide alphabetical ordering
+function alphabeticalSort(a, b) {
+  a = a.toLowerCase();
+  b = b.toLowerCase();
+  return a.localeCompare(b);
+}
+
+function alphabeticalSortName(a, b) {
+  return alphabeticalSort(a.name, b.name);
+}
 
 //Reorders folder contents
-function reorderFolderContents() {
+export function reorderFolderContents() {
   //Get array of folders from 'folder-children' key
   let folderArray = folderSettings.get_value('folder-children').get_strv();
 
@@ -64,29 +71,18 @@ function orderByDisplayName(inputArray) {
   });
 
   //Alphabetically sort the folder's contents, by the display name
-  outputArray.sort((a, b) => {
-    a = a.toLowerCase();
-    b = b.toLowerCase();
-    return a.localeCompare(b);
-  });
+  outputArray.sort(alphabeticalSort);
 
   //Replace each element with the app's .desktop filename
-  outputArray.forEach((currentTarget, i) => { outputArray[i] = currentTarget.desktopFile; });
+  outputArray.forEach((currentTarget, i) => {outputArray[i] = currentTarget.desktopFile;});
   return outputArray;
 }
 
-//Helper to provide alphabetical ordering
-function alphabeticalSort(a, b) {
-  let aName = a.name.toLowerCase();
-  let bName = b.name.toLowerCase();
-  return aName.localeCompare(bName);
-}
-
 //Replaces shell's _compareItems() to provide custom order
-function compareItems(a, b, folderPosition, folderArray) {
+export function compareItems(a, b, folderPosition, folderArray) {
   //Skip extra steps if a regular alphabetical order is required
   if (folderPosition == 'alphabetical') {
-    return alphabeticalSort(a, b);
+    return alphabeticalSortName(a, b);
   }
 
   let isAFolder = folderArray.includes(a._id);
@@ -94,27 +90,15 @@ function compareItems(a, b, folderPosition, folderArray) {
 
   //If they're both folders or both apps, order alphabetically
   if (isAFolder == isBFolder) {
-    return alphabeticalSort(a, b);
+    return alphabeticalSortName(a, b);
   }
 
   //If one is a folder, move it to the configured position
-  if (isAFolder) { //Item a is the folder
-    if (folderPosition == 'start') {
-      return -1; //Move a before b
-    } else {
-      return 1; //Move a after b
-    }
-  } else { //Item b is the folder
-    if (folderPosition == 'start') {
-      return 1; //Move a after b
-    } else {
-      return -1; //Move a before b
-    }
-  }
+  return (folderPosition === 'start') ^ isAFolder ? 1 : -1;
 }
 
 //Called during custom _redisplay()
-function reloadAppGrid() {
+export function reloadAppGrid() {
   //Existing apps
   let currentApps = this._orderedItems.slice();
   let currentAppIds = currentApps.map(icon => icon.id);
@@ -134,7 +118,7 @@ function reloadAppGrid() {
   });
 
   //Move each app to the correct grid postion
-  const { itemsPerPage } = this._grid;
+  const {itemsPerPage} = this._grid;
   newApps.forEach((icon, i) => {
     const page = Math.floor(i / itemsPerPage);
     const position = i % itemsPerPage;
