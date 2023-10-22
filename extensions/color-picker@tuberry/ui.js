@@ -1,173 +1,395 @@
 // vim:fdm=syntax
 // by tuberry
-/* exported Block File Color Keys PrefRow Drop LazyEntry Spin */
-'use strict';
 
-const { Adw, Gtk, Gdk, GObject, Gio } = imports.gi;
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
-const { _, _GTK, fl, genParam, fquery } = Me.imports.util;
+import Adw from 'gi://Adw';
+import Gdk from 'gi://Gdk';
+import Gio from 'gi://Gio';
+import Gtk from 'gi://Gtk';
+import GLib from 'gi://GLib';
+import Pango from 'gi://Pango';
+import GObject from 'gi://GObject';
 
-var Block = class {
-    constructor(ws) {
-        this.gset = ExtensionUtils.getSettings();
-        for(let [k, [x, y, z]] of Object.entries(ws)) { this[k] = z; this.gset.bind(x, z, y, Gio.SettingsBindFlags.DEFAULT); }
+import * as Gettext from 'gettext';
+import { Field } from './const.js';
+
+import { fopen, raise, omap, noop, gprops, fquery } from './util.js';
+import { ExtensionPreferences, gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+
+export { _ };
+export const _GTK = Gettext.domain('gtk40').gettext;
+export const grgba = x => (c => [c.parse(x ?? ''), c])(new Gdk.RGBA());
+export const conns = (o, ...a) => a.forEach(([k, v]) => o.connect(k, v));
+export const getSelf = () => ExtensionPreferences.lookupByURL(import.meta.url);
+export const block = (o, s) => omap(o, ([k, [x, y]]) => [[k, (s.bind(Field[k], y, x, Gio.SettingsBindFlags.DEFAULT), y)]]);
+
+Gio._promisify(Gtk.FileDialog.prototype, 'open');
+Gio._promisify(Gtk.FileDialog.prototype, 'select_folder');
+
+export class Prefs extends ExtensionPreferences {
+    getPreferencesWidget() {
+        if(this.$klass) return new this.$klass(this.getSettings());
     }
-};
+}
 
-var File = class extends Gtk.Box {
+export class Box extends Gtk.Box {
+    static {
+        GObject.registerClass(this);
+    }
+
+    constructor(children, param) {
+        super({ valign: Gtk.Align.CENTER, ...param });
+        children?.forEach(x => this.append(x));
+        this.add_css_class('linked');
+    }
+}
+
+export class Spin extends Gtk.SpinButton {
+    static {
+        GObject.registerClass(this);
+    }
+
+    constructor(l, u, s, tip) {
+        super({ tooltip_text: tip || '', valign: Gtk.Align.CENTER });
+        this.set_adjustment(new Gtk.Adjustment({ lower: l, upper: u, step_increment: s }));
+    }
+}
+
+export class Drop extends Gtk.DropDown {
+    static {
+        GObject.registerClass(this);
+    }
+
+    constructor(args, tip) {
+        super({ model: Gtk.StringList.new(args), valign: Gtk.Align.CENTER, tooltip_text: tip || '' });
+    }
+}
+
+export class Font extends Gtk.FontDialogButton {
     static {
         GObject.registerClass({
-            Properties: {
-                file: genParam('string', 'file', ''),
+            Properties: gprops({
+                value: ['string', ''],
+            }),
+        }, this);
+    }
+
+    constructor(param) {
+        super({ valign: Gtk.Align.CENTER, dialog: new Gtk.FontDialog(), ...param });
+        this.connect('notify::font-desc', () => this.notify('value'));
+    }
+
+    get value() {
+        return this.get_font_desc().to_string();
+    }
+
+    set value(value) {
+        this.set_font_desc(Pango.FontDescription.from_string(value));
+    }
+}
+
+export class Color extends Gtk.ColorDialogButton {
+    static {
+        GObject.registerClass({
+            Properties: gprops({
+                value: ['string', ''],
+            }),
+        }, this);
+    }
+
+    constructor(param) {
+        super({ tooltip_text: param?.title ?? '', valign: Gtk.Align.CENTER, dialog: new Gtk.ColorDialog(param) });
+        this.connect('notify::rgba', () => this.notify('value'));
+    }
+
+    get value() {
+        return this.get_rgba().to_string();
+    }
+
+    set value(value) {
+        let [ok, rgba] = grgba(value);
+        if(ok) this.set_rgba(rgba);
+    }
+}
+
+export class IconLabel extends Gtk.Box {
+    static {
+        GObject.registerClass(this);
+    }
+
+    constructor(fallback_icon) {
+        super({ spacing: 5 });
+        this._icon = new Gtk.Image();
+        this._label = new Gtk.Label();
+        this._fallback_icon = fallback_icon;
+        [this._icon, this._label].forEach(x => this.append(x));
+    }
+
+    set_info(icon, text) {
+        this._label.set_label(text || _GTK('(None)'));
+        if(typeof icon !== 'string') this._icon.set_from_gicon(icon);
+        else this._icon.icon_name = icon || this._fallback_icon;
+    }
+}
+
+export class AppDialog extends Adw.Window {
+    static {
+        GObject.registerClass({
+            Signals: {
+                selected: { param_types: [GObject.TYPE_STRING] },
             },
+        }, this);
+    }
+
+    constructor(param) {
+        super({ title: _GTK('Select Application'), modal: true, hide_on_close: true, width_request: 280, height_request: 320 });
+        this._buildContent(param);
+    }
+
+    _buildList(param) {
+        let factory = new Gtk.SignalListItemFactory();
+        conns(factory, ['setup', (_f, x) => x.set_child(new IconLabel('application-x-executable-symbolic'))],
+            ['bind', (_f, x) => x.get_child().set_info(...(y => [y.get_icon() || '', y.get_display_name()])(x.get_item()))]);
+        let model = new Gio.ListStore({ item_type: Gio.DesktopAppInfo });
+        if(param?.no_display) Gio.AppInfo.get_all().forEach(x => model.append(x));
+        else Gio.AppInfo.get_all().filter(x => x.should_show()).forEach(x => model.append(x));
+        let expression = new Gtk.ClosureExpression(GObject.TYPE_STRING, x => `${x.get_executable()}:${x.get_display_name()}`, null);
+        this._filter = new Gtk.StringFilter({ expression });
+        this._select = new Gtk.SingleSelection({ model: new Gtk.FilterListModel({ model, filter: this._filter }) });
+        let list = new Gtk.ListView({ model: this._select, factory, single_click_activate: false, vexpand: true });
+        list.connect('activate', () => this._onSelect());
+        return new Gtk.ScrolledWindow({ child: list });
+    }
+
+    _buildContent(param) {
+        let eck = new Gtk.EventControllerKey(),
+            close = Gtk.Button.new_with_mnemonic(_GTK('_Close')),
+            select = Gtk.Button.new_with_mnemonic(_GTK('_Select')),
+            entry = new Gtk.SearchEntry({ halign: Gtk.Align.CENTER }),
+            box = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL }),
+            bar = new Gtk.SearchBar({ show_close_button: false, child: entry }),
+            header = new Adw.HeaderBar({ show_end_title_buttons: false, show_start_title_buttons: false });
+        this._search = new Gtk.ToggleButton({ icon_name: 'system-search-symbolic' });
+
+        select.add_css_class('suggested-action');
+        close.connect('clicked', () => this.close());
+        select.connect('clicked', () => this._onSelect());
+        eck.connect('key-pressed', (_w, k) => k === Gdk.KEY_Escape && this.close());
+        entry.connect('search-changed', x => this._filter.set_search(x.get_text()));
+        this._search.bind_property('active', bar, 'search-mode-enabled', GObject.BindingFlags.BIDIRECTIONAL);
+        this.connect('close-request', () => this._search.set_active(false));
+        bar.set_key_capture_widget(this);
+        bar.connect_entry(entry);
+
+        this.add_controller(eck);
+        header.pack_start(close);
+        [select, this._search].forEach(x => header.pack_end(x));
+        [header, bar, this._buildList(param)].forEach(x => box.append(x));
+        this.set_content(box);
+    }
+
+    _onSelect() {
+        this.close();
+        this.emit('selected', this._select.get_selected_item().get_id());
+    }
+}
+
+export class DlgBtnBase extends Box {
+    static {
+        GObject.registerClass({
+            Properties: gprops({
+                value: ['string', ''],
+            }),
             Signals: {
                 changed: { param_types: [GObject.TYPE_STRING] },
             },
         }, this);
     }
 
-    constructor(params, attr) {
-        super({ valign: Gtk.Align.CENTER, css_classes: ['linked'] }); // no 'always-show-image'
-        let box = new Gtk.Box({ spacing: 5 });
-        this._icon = new Gtk.Image({ icon_name: 'document-open-symbolic' });
-        this._label = new Gtk.Label({ label: _GTK('(None)') });
-        [this._icon, this._label].forEach(x => box.append(x));
-        this._btn = new Gtk.Button({ child: box });
-        let reset = new Gtk.Button({ icon_name: 'edit-clear-symbolic', tooltip_text: _('Clear') });
-        reset.connect('clicked', () => { this.file = ''; });
-        this._btn.connect('clicked', this._onClicked.bind(this));
-        [this._btn, reset].forEach(x => this.append(x));
-        this._buildChooser(params);
-        this._attr = attr ?? [Gio.FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME, Gio.FILE_ATTRIBUTE_STANDARD_ICON].join(',');
+    constructor(child, gtype, reset) {
+        super();
+        this._btn = new Gtk.Button({ child });
+        this._btn.connect('clicked', () => this._onClick().then(x => { this.value = x; }).catch(noop));
+        if(gtype) this._buildDND(gtype);
+        if(reset) this._buildReset();
+        this.prepend(this._btn);
+        this.value = '';
+    }
+
+    _buildReset() {
+        let clear = new Gtk.Button({ icon_name: 'edit-clear-symbolic', tooltip_text: _('Clear') });
+        clear.connect('clicked', () => { this.value = ''; });
+        this.append(clear);
+    }
+
+    _buildDND(gtype) {
+        let drop = Gtk.DropTarget.new(gtype, Gdk.DragAction.COPY);
+        drop.connect('drop', this._onDrop.bind(this));
+        let drag = new Gtk.DragSource({ actions: Gdk.DragAction.COPY });
+        drag.connect('prepare', () => Gdk.ContentProvider.new_for_value(this._gvalue));
+        [drop, drag].forEach(x => this._btn.add_controller(x));
+    }
+
+    _onDrop(_t, x) {
+        this.value = x;
+    }
+
+    set value(v) {
+        if(typeof v === 'string' ? this._value === v : this._gvalue?.equal(v)) return;
+        this._setValue(v);
+        this.notify('value');
+        this.emit('changed', this.value);
+    }
+
+    get value() {
+        return this._value;
     }
 
     vfunc_mnemonic_activate() {
         this._btn.activate();
     }
+}
 
-    _buildChooser(params) {
-        this.chooser = new Gtk.FileChooserNative({
-            modal: Gtk.DialogFlags.MODAL,
-            title: params?.title ?? _GTK('File'),
-            action: params?.action ?? Gtk.FileChooserAction.OPEN,
-        });
-        this.chooser.connect('response', (widget, response) => {
-            if(response !== Gtk.ResponseType.ACCEPT) return;
-            this.file = widget.get_file().get_path();
-            this.emit('changed', this.file);
-        });
-        if(!params?.filter) return;
-        let filter = new Gtk.FileFilter();
-        params.filter.includes('/') ? filter.add_mime_type(params.filter) : filter.add_pattern(params.filter);
-        this.chooser.add_filter(filter);
-    }
-
-    _setLabel(label) {
-        this._label.set_label(label || _GTK('(None)'));
-    }
-
-    _onClicked() {
-        this.chooser.set_transient_for(this.get_root());
-        this.chooser.show();
-    }
-
-    get file() {
-        return this._file ?? '';
-    }
-
-    async _setFile(path) {
-        let file = fl(path);
-        let info = await fquery(file, this._attr);
-        this._setLabel(info.get_display_name());
-        this._icon.set_from_gicon(info.get_icon());
-        if(!this.file) this.chooser.set_file(file);
-        this._file = path;
-    }
-
-    _setEmpty() {
-        this._setLabel(null);
-        this._icon.icon_name = 'document-open-symbolic';
-        this._file = '';
-    }
-
-    _emitChange(prev) {
-        if(prev === undefined || prev === this.file) return;
-        this.emit('changed', this.file);
-        this.notify('file');
-    }
-
-    set file(path) {
-        let prev = this._file;
-        this._setFile(path).catch(() => this._setEmpty()).finally(() => this._emitChange(prev));
-    }
-};
-
-var Color = class extends Gtk.ColorButton {
+export class App extends DlgBtnBase {
     static {
-        GObject.registerClass({
-            Properties: {
-                colour: genParam('string', 'colour', ''),
-            },
-        }, this);
+        GObject.registerClass(this);
     }
 
-    constructor(text, alpha) {
-        super({ use_alpha: !alpha, title: text, tooltip_text: text, valign: Gtk.Align.CENTER });
-        this.connect('color-set', () => this.notify('colour'));
+    constructor() {
+        super(new IconLabel('application-x-executable-symbolic'), null, true);
     }
 
-    get colour() {
-        return this.get_rgba().to_string();
+    _setValue(v) {
+        let type = typeof v === 'string';
+        this._gvalue = type ? Gio.DesktopAppInfo.new(v) : v;
+        this._value = type ? v : v.get_id();
+        this._showValue();
     }
 
-    set colour(value) {
-        let color = new Gdk.RGBA();
-        if(color.parse(value)) this.set_rgba(color);
+    _showValue() {
+        if(this._gvalue) this._btn.child.set_info(this._gvalue.get_icon(), this._gvalue.get_display_name());
+        else this._btn.child.set_info('');
     }
-};
 
-var Keys = class extends Gtk.Button {
+    _buildDialog() {
+        this._dlg = new AppDialog();
+        this._dlg.connect('selected', x => { this.value = x._select.get_selected_item(); });
+    }
+
+    _onClick() {
+        if(!this._dlg) this._buildDialog();
+        this._dlg.present();
+        let root = this.get_root();
+        if(this._dlg.transient_for !== root) this._dlg.set_transient_for(root);
+        return Promise.reject(new Error()); // compatible with super
+    }
+}
+
+export class File extends DlgBtnBase {
     static {
-        GObject.registerClass({
-            Properties: {
-                shortcut: genParam('string', 'shortcut', ''),
-            },
-            Signals: {
-                changed: { param_types: [GObject.TYPE_STRING] },
-            },
-        }, this);
+        GObject.registerClass(this);
     }
 
-    constructor(setting, key) {
+    constructor(param) {
+        super(new IconLabel('document-open-symbolic'), Gio.File.$gtype, true);
+        if(param?.select_folder) param.filter = { mime_types:  ['inode/directory'] };
+        if(param?.filter) this._filter = new Gtk.FileFilter(param.filter);
+        this._param = param;
+    }
+
+    _buildDialog() {
+        this._dlg = new Gtk.FileDialog({ modal: true });
+        if(this._param?.title) this._dlg.set_title(this._param.title);
+        if(this._filter) this._dlg.set_default_filter(this._filter);
+    }
+
+    _onDrop(_t, value) {
+        if(!this._filter) {
+            this.value = value;
+        } else {
+            fquery(value, Gio.FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME, Gio.FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE).then(y => {
+                if(this._filter.match(y)) this.value = value; else raise();
+            }).catch(() => { // ISSUE: folders - https://gitlab.gnome.org/GNOME/gtk/-/issues/5348
+                this.get_root().add_toast(new Adw.Toast({ title: _('Mismatched filetype'), timeout: 5 }));
+            });
+        }
+    }
+
+    _setValue(v) {
+        let type = typeof v === 'string';
+        this._gvalue = type ? fopen(v) : v;
+        this._value = type ? v : v.get_path() ?? '';
+        this._showValue(this._value);
+    }
+
+    _showValue(v) {
+        fquery(this._gvalue, Gio.FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME, Gio.FILE_ATTRIBUTE_STANDARD_ICON)
+            .then(x => this._setInfo(x.get_icon(), x.get_display_name(), v)).catch(() => this._setInfo('', null, v));
+    }
+
+    _onClick() {
+        if(!this._dlg) this._buildDialog();
+        return this._dlg[this._param?.select_folder ? 'select_folder' : 'open'](this.get_root(), null);
+    }
+
+    _setInfo(icon, text, value) {
+        if(value !== this.value) return;
+        this._btn.child.set_info(icon, text);
+    }
+}
+
+export class Icon extends File {
+    static {
+        GObject.registerClass(this);
+    }
+
+    constructor() {
+        super({ filter: { mime_types: ['image/svg+xml'] } });
+    }
+
+    _showValue(v) {
+        fquery(this._gvalue, Gio.FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME, Gio.FILE_ATTRIBUTE_STANDARD_ICON).then(x => {
+            let name = GLib.basename(x.get_display_name()).replace(/\.svg$/, '');
+            let icon = Gtk.IconTheme.get_for_display(Gdk.Display.get_default()).has_icon(name) ? name : '';
+            this._setInfo(icon || x.get_icon(), x.get_display_name().replace(RegExp(/(-symbolic)*\.svg$/), ''), v);
+        }).catch(() => this._setInfo('', null, v));
+    }
+}
+
+export class Keys extends Gtk.Button {
+    static {
+        GObject.registerClass(this);
+    }
+
+    constructor(gset, key) {
         super({ valign: Gtk.Align.CENTER, has_frame: false });
-        this._key = key;
-        this._setting = setting;
-        let label = new Gtk.ShortcutLabel({ disabled_text: _GTK('New accelerator…') });
-        this.bind_property('shortcut', label, 'accelerator', GObject.BindingFlags.DEFAULT);
-        this.connect('clicked', this._onActivated.bind(this));
-        [this.shortcut] = this._setting.get_strv(this._key);
-        this.set_child(label);
+        this._label = new Gtk.ShortcutLabel({ disabled_text: _GTK('New accelerator…') });
+        this._label.set_accelerator(gset.get_strv(key).at(0));
+        this.setShortcut = x => { gset.set_strv(key, [x]); this._label.set_accelerator(x); };
+        this.connect('clicked', () => this._onClick());
+        this.set_child(this._label);
+        this._buildDialog();
     }
 
-    _onActivated(widget) {
-        let ctl = new Gtk.EventControllerKey();
+    _buildDialog() {
         let content = new Adw.StatusPage({ title: _GTK('New accelerator…'), icon_name: 'preferences-desktop-keyboard-shortcuts-symbolic' });
-        this._editor = new Adw.Window({ modal: true, hide_on_close: true, transient_for: widget.get_root(), width_request: 480, height_request: 320, content });
-        this._editor.add_controller(ctl);
-        ctl.connect('key-pressed', this._onKeyPressed.bind(this));
-        this._editor.present();
+        this._dlg = new Adw.Window({ modal: true, hide_on_close: true, width_request: 480, height_request: 320, content });
+        let eck = new Gtk.EventControllerKey();
+        eck.connect('key-pressed', this._onKeyPressed.bind(this));
+        this._dlg.add_controller(eck);
+    }
+
+    _onClick() {
+        this._dlg.present();
+        let root = this.get_root();
+        if(this._dlg.transient_for !== root) this._dlg.set_transient_for(root);
     }
 
     _onKeyPressed(_widget, keyval, keycode, state) {
         let mask = state & Gtk.accelerator_get_default_mod_mask() & ~Gdk.ModifierType.LOCK_MASK;
-        if(!mask && keyval === Gdk.KEY_Escape) { this._editor.close(); return Gdk.EVENT_STOP; }
-        if(!this.isValidBinding(mask, keycode, keyval) || !this.isValidAccel(mask, keyval)) return Gdk.EVENT_STOP;
-        this.shortcut = Gtk.accelerator_name_with_keycode(null, keyval, keycode, mask);
-        this.emit('changed', this.shortcut);
-        this._setting.set_strv(this._key, [this.shortcut]);
-        this._editor.destroy();
-        return Gdk.EVENT_STOP;
+        if(!mask && keyval === Gdk.KEY_Escape) return this._dlg.close();
+        if(!this.isValidBinding(mask, keycode, keyval) || !this.isValidAccel(mask, keyval)) return;
+        this.setShortcut(Gtk.accelerator_name_with_keycode(null, keyval, keycode, mask));
+        this._dlg.close();
     }
 
     keyvalIsForbidden(keyval) {
@@ -195,9 +417,9 @@ var Keys = class extends Gtk.Button {
     isValidAccel(mask, keyval) {
         return Gtk.accelerator_valid(keyval, mask) || (keyval === Gdk.KEY_Tab && mask !== 0);
     }
-};
+}
 
-var PrefRow = class extends Adw.ActionRow {
+export class PrefRow extends Adw.ActionRow {
     static {
         GObject.registerClass(this);
     }
@@ -227,36 +449,14 @@ var PrefRow = class extends Adw.ActionRow {
             }
         }
     }
-};
+}
 
-var Spin = class extends Gtk.SpinButton {
-    static {
-        GObject.registerClass(this);
-    }
-
-    constructor(l, u, s, tip) {
-        super({ tooltip_text: tip || '', valign: Gtk.Align.CENTER });
-        this.set_adjustment(new Gtk.Adjustment({ lower: l, upper: u, step_increment: s }));
-    }
-};
-
-var Drop = class extends Gtk.DropDown {
-    // NOTE: upstream issue - https://gitlab.gnome.org/GNOME/gtk/-/issues/2877
-    static {
-        GObject.registerClass(this);
-    }
-
-    constructor(args, tip) {
-        super({ model: Gtk.StringList.new(args), valign: Gtk.Align.CENTER, tooltip_text: tip || '' });
-    }
-};
-
-var LazyEntry = class extends Gtk.Stack {
+export class LazyEntry extends Gtk.Stack {
     static {
         GObject.registerClass({
-            Properties: {
-                text: genParam('string', 'text', ''),
-            },
+            Properties: gprops({
+                text: ['string', ''],
+            }),
             Signals: {
                 changed: { param_types: [GObject.TYPE_STRING] },
             },
@@ -269,8 +469,8 @@ var LazyEntry = class extends Gtk.Stack {
         this._entry = new Gtk.Entry({ hexpand: true, enable_undo: true, placeholder_text: holder || '' });
         this._edit = new Gtk.Button({ icon_name: 'document-edit-symbolic', tooltip_text: tip || '' });
         this._done = new Gtk.Button({ icon_name: 'object-select-symbolic', tooltip_text: _('Click or press ENTER to commit changes'), css_classes: ['suggested-action'] });
-        this.add_named(this._mkBox(this._label, this._edit), 'label');
-        this.add_named(this._mkBox(this._entry, this._done), 'entry');
+        this.add_named(new Box([this._label, this._edit], { hexpand: true }), 'label');
+        this.add_named(new Box([this._entry, this._done], { hexpand: true }), 'entry');
         this.bind_property('text', this._label, 'text', GObject.BindingFlags.BIDIRECTIONAL | GObject.BindingFlags.SYNC_CREATE);
         this._edit.connect('clicked', () => this._onEdit());
         this._done.connect('clicked', () => this._onDone());
@@ -302,10 +502,4 @@ var LazyEntry = class extends Gtk.Stack {
     vfunc_mnemonic_activate() {
         this.get_visible_child_name() === 'label' ? this._edit.activate() : this._done.activate();
     }
-
-    _mkBox(...ws) {
-        let box = new Gtk.Box({ css_classes: ['linked'], hexpand: true });
-        ws.forEach(x => box.append(x));
-        return box;
-    }
-};
+}
