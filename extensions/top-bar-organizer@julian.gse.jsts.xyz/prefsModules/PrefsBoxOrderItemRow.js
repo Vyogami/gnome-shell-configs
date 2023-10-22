@@ -1,22 +1,35 @@
 "use strict";
-/* exported PrefsBoxOrderItemRow */
 
-const Gtk = imports.gi.Gtk;
-const Gdk = imports.gi.Gdk;
-const Gio = imports.gi.Gio;
-const GObject = imports.gi.GObject;
-const Adw = imports.gi.Adw;
+import Gtk from "gi://Gtk";
+import Gdk from "gi://Gdk";
+import GObject from "gi://GObject";
+import Adw from "gi://Adw";
+import GLib from "gi://GLib";
 
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
+export default class PrefsBoxOrderItemRow extends Adw.ActionRow {
+    static {
+        GObject.registerClass({
+            GTypeName: "PrefsBoxOrderItemRow",
+            Template: GLib.uri_resolve_relative(import.meta.url, "../ui/prefs-box-order-item-row.ui", GLib.UriFlags.NONE),
+            InternalChildren: [
+                "item-name-display-label",
+            ],
+            Signals: {
+                "move": {
+                    param_types: [GObject.TYPE_STRING],
+                },
+            },
+        }, this);
+        this.install_action("row.forget", null, (self, _actionName, _param) => {
+            const parentListBox = self.get_parent();
+            parentListBox.removeRow(self);
+            parentListBox.saveBoxOrderToSettings();
+            parentListBox.determineRowMoveActionEnable();
+        });
+        this.install_action("row.move-up", null, (self, _actionName, _param) => self.emit("move", "up"));
+        this.install_action("row.move-down", null, (self, _actionName, _param) => self.emit("move", "down"));
+    }
 
-var PrefsBoxOrderItemRow = GObject.registerClass({
-    GTypeName: "PrefsBoxOrderItemRow",
-    Template: Me.dir.get_child("ui").get_child("prefs-box-order-item-row.ui").get_uri(),
-    InternalChildren: [
-        "item-name-display-label"
-    ]
-}, class PrefsBoxOrderItemRow extends Adw.ActionRow {
     #drag_starting_point_x;
     #drag_starting_point_y;
 
@@ -24,7 +37,6 @@ var PrefsBoxOrderItemRow = GObject.registerClass({
         super(params);
 
         this.#associateItem(item);
-        this.#setupActions();
     }
 
     /**
@@ -42,25 +54,6 @@ var PrefsBoxOrderItemRow = GObject.registerClass({
             // Otherwise just set it to `item`.
             this._item_name_display_label.set_label(item);
         }
-    }
-
-    /**
-     * Setup actions.
-     */
-    #setupActions() {
-        const actionGroup = new Gio.SimpleActionGroup();
-
-        const forgetAction = new Gio.SimpleAction({
-            name: "forget"
-        });
-        forgetAction.connect("activate", (_action, _params) => {
-            const parentListBox = this.get_parent();
-            parentListBox.remove(this);
-            parentListBox.saveBoxOrderToSettings();
-        });
-        actionGroup.add_action(forgetAction);
-
-        this.insert_action_group("options", actionGroup);
     }
 
     onDragPrepare(_source, x, y) {
@@ -104,7 +97,7 @@ var PrefsBoxOrderItemRow = GObject.registerClass({
         const valuePosition = value.get_index();
 
         // Remove the drop value from its list box.
-        valueListBox.remove(value);
+        valueListBox.removeRow(value);
 
         // Since an element got potentially removed from the list of `this`,
         // get the position of `this` again.
@@ -118,29 +111,31 @@ var PrefsBoxOrderItemRow = GObject.registerClass({
                 || (ownListBox.boxOrder === "center-box-order" && valueListBox.boxOrder === "left-box-order")) {
                 // If the list box of the drop value comes before the list
                 // box of `this`, add the drop value after `this`.
-                ownListBox.insert(value, updatedOwnPosition + 1);
+                ownListBox.insertRow(value, updatedOwnPosition + 1);
             } else {
                 // Otherwise, add the drop value where `this` currently is.
-                ownListBox.insert(value, updatedOwnPosition);
+                ownListBox.insertRow(value, updatedOwnPosition);
             }
         } else {
             if (valuePosition < ownPosition) {
                 // If the drop value was before `this`, add the drop value
                 // after `this`.
-                ownListBox.insert(value, updatedOwnPosition + 1);
+                ownListBox.insertRow(value, updatedOwnPosition + 1);
             } else {
                 // Otherwise, add the drop value where `this` currently is.
-                ownListBox.insert(value, updatedOwnPosition);
+                ownListBox.insertRow(value, updatedOwnPosition);
             }
         }
 
-        /// Finally save the box order(/s) to settings.
+        /// Finally save the box order(/s) to settings and make sure move
+        /// actions are correctly enabled/disabled.
         ownListBox.saveBoxOrderToSettings();
-        // If the list boxes of `this` and the drop value were different,
-        // save an updated box order for the list were the drop value was in
-        // as well.
+        ownListBox.determineRowMoveActionEnable();
+        // If the list boxes of `this` and the drop value were different, handle
+        // the former list box of the drop value as well.
         if (ownListBox !== valueListBox) {
             valueListBox.saveBoxOrderToSettings();
+            valueListBox.determineRowMoveActionEnable();
         }
     }
-});
+}

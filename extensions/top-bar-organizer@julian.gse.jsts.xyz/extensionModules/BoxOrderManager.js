@@ -1,11 +1,8 @@
 "use strict";
-/* exported BoxOrderManager */
 
-const GObject = imports.gi.GObject;
+import GObject from "gi://GObject";
 
-const ExtensionUtils = imports.misc.extensionUtils;
-
-const Main = imports.ui.main;
+import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
 /**
  * This class provides methods get, set and interact with box orders, while
@@ -13,22 +10,26 @@ const Main = imports.ui.main;
  * what is really useable by the other extension code.
  * It's basically a heavy wrapper around the box orders stored in the settings.
  */
-var BoxOrderManager = GObject.registerClass({
-    Signals: {
-        "appIndicatorReady": {}
+export default class BoxOrderManager extends GObject.Object {
+    static {
+        GObject.registerClass({
+            Signals: {
+                "appIndicatorReady": {},
+            },
+        }, this);
     }
-}, class BoxOrderManager extends GObject.Object {
+
     #appIndicatorReadyHandlerIdMap;
     #appIndicatorItemApplicationRoleMap;
     #settings;
 
-    constructor(params = {}) {
+    constructor(params = {}, settings) {
         super(params);
 
         this.#appIndicatorReadyHandlerIdMap = new Map();
         this.#appIndicatorItemApplicationRoleMap = new Map();
 
-        this.#settings = ExtensionUtils.getSettings();
+        this.#settings = settings;
     }
 
     /**
@@ -156,7 +157,7 @@ var BoxOrderManager = GObject.registerClass({
         const indicatorContainers = [
             Main.panel._leftBox.get_children(),
             Main.panel._centerBox.get_children(),
-            Main.panel._rightBox.get_children()
+            Main.panel._rightBox.get_children(),
         ].flat();
 
         // Create an indicator containers set from the indicator containers for
@@ -211,7 +212,7 @@ var BoxOrderManager = GObject.registerClass({
             center: Main.panel._centerBox.get_children(),
             // Reverse this array, since the items in the left and center box
             // are logically LTR, while the items in the right box are RTL.
-            right: Main.panel._rightBox.get_children().reverse()
+            right: Main.panel._rightBox.get_children().reverse(),
         };
 
         // This function goes through the indicator containers of the given box
@@ -270,4 +271,4 @@ var BoxOrderManager = GObject.registerClass({
         saveBoxOrderToSettings(boxOrders.center, "center");
         saveBoxOrderToSettings(boxOrders.right, "right");
     }
-});
+}
