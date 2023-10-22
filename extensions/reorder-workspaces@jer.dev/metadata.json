@@ -4,11 +4,9 @@
   "name": "Reorder Workspaces",
   "settings-schema": "org.gnome.shell.extensions.reorder-workspaces",
   "shell-version": [
-    "42",
-    "43",
-    "44"
+    "45"
   ],
   "url": "https://github.com/smmr0/gnome-reorder-workspaces",
   "uuid": "reorder-workspaces@jer.dev",
-  "version": 21
+  "version": 22
 }
