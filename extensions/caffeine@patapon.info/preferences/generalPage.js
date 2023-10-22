@@ -16,35 +16,31 @@
 
    // From https://gitlab.com/skrewball/openweather/-/blob/master/src/prefs.js
 */
+/* exported GeneralPage */
 'use strict';
 
-const { Adw, Gtk, GObject, Gdk } = imports.gi;
+import Adw from 'gi://Adw';
+import Gtk from 'gi://Gtk';
+import GObject from 'gi://GObject';
+import Gdk from 'gi://Gdk';
 
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
-const Gettext = imports.gettext.domain(Me.metadata['gettext-domain']);
-const _ = Gettext.gettext;
+import { gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+
 const genParam = (type, name, ...dflt) => GObject.ParamSpec[type](name, name, name, GObject.ParamFlags.READWRITE, ...dflt);
 
-const ComboBoxChoices = {
-    NEVER: _("Never"),
-    ALWAYS: _("Always"),
-    FOR_APPS: _("For apps on list"),
-};
-
 const TIMERS_DURATION = [
-    "05, 10, 30",
-    "10, 20, 45",
-    "15, 30, 60",
-    "20, 40, 75",
-    "30, 50, 80"
+    '05, 10, 30',
+    '10, 20, 45',
+    '15, 30, 60',
+    '20, 40, 75',
+    '30, 50, 80'
 ];
 
-var GeneralPage = GObject.registerClass(
-class Caffeine_GeneralPage extends Adw.PreferencesPage {
+export var GeneralPage = GObject.registerClass(
+class CaffeineGeneralPage extends Adw.PreferencesPage {
     _init(settings, settingsKey) {
         super._init({
-            title: _("General"),
+            title: _('General'),
             icon_name: 'general-symbolic',
             name: 'GeneralPage'
         });
@@ -54,7 +50,7 @@ class Caffeine_GeneralPage extends Adw.PreferencesPage {
         // Behavior group
         // --------------
         let behaviorGroup = new Adw.PreferencesGroup({
-            title: _("Behavior")
+            title: _('Behavior')
         });
 
         // Enable / Disable fullscreen apps
@@ -63,8 +59,8 @@ class Caffeine_GeneralPage extends Adw.PreferencesPage {
             active: this._settings.get_boolean(this._settingsKey.FULLSCREEN)
         });
         let disableFullscreenRow = new Adw.ActionRow({
-            title: _("Enable for fullscreen apps"),
-            subtitle: _("Automatically enable when an app enters fullscreen mode"),
+            title: _('Enable for fullscreen apps'),
+            subtitle: _('Automatically enable when an app enters fullscreen mode'),
             activatable_widget: disableFullscreenSwitch
         });
         disableFullscreenRow.add_suffix(disableFullscreenSwitch);
@@ -75,32 +71,32 @@ class Caffeine_GeneralPage extends Adw.PreferencesPage {
             active: this._settings.get_boolean(this._settingsKey.RESTORE)
         });
         let rememberStateRow = new Adw.ActionRow({
-            title: _("Remember state"),
-            subtitle: _("Remember the last state across sessions and reboots"),
+            title: _('Remember state'),
+            subtitle: _('Remember the last state across sessions and reboots'),
             activatable_widget: rememberStateSwitch
         });
         rememberStateRow.add_suffix(rememberStateSwitch);
 
         // Pause and resume Night Light
         let pauseNightLight = new Gtk.StringList();
-        pauseNightLight.append(ComboBoxChoices.NEVER);
-        pauseNightLight.append(ComboBoxChoices.ALWAYS);
-        pauseNightLight.append(ComboBoxChoices.FOR_APPS);
+        pauseNightLight.append(_('Never'));
+        pauseNightLight.append(_('Always'));
+        pauseNightLight.append(_('For apps on list'));
         let pauseNightLightRow = new Adw.ComboRow({
-            title: _("Pause and resume Night Light"),
-            subtitle: _("Toggles the night light together with Caffeine\'s state"),
+            title: _('Pause and resume Night Light'),
+            subtitle: _('Toggles the night light together with Caffeine\'s state'),
             model: pauseNightLight,
             selected: this._settings.get_enum(this._settingsKey.NIGHT_LIGHT)
         });
 
         // Allow blank screen
         let allowBlankScreen = new Gtk.StringList();
-        allowBlankScreen.append(ComboBoxChoices.NEVER);
-        allowBlankScreen.append(ComboBoxChoices.ALWAYS);
-        allowBlankScreen.append(ComboBoxChoices.FOR_APPS);
+        allowBlankScreen.append(_('Never'));
+        allowBlankScreen.append(_('Always'));
+        allowBlankScreen.append(_('For apps on list'));
         let allowBlankScreenRow = new Adw.ComboRow({
-            title: _("Allow screen blank"),
-            subtitle: _("Allow turning off screen when Caffeine is enabled"),
+            title: _('Allow screen blank'),
+            subtitle: _('Allow turning off screen when Caffeine is enabled'),
             model: allowBlankScreen,
             selected: this._settings.get_enum(this._settingsKey.SCREEN_BLANK)
         });
@@ -115,12 +111,12 @@ class Caffeine_GeneralPage extends Adw.PreferencesPage {
         // Timer group
         // --------------
         let timerGroup = new Adw.PreferencesGroup({
-            title: _("Timer")
+            title: _('Timer')
         });
 
         const durationIndex = this._settings.get_int(this._settingsKey.DURATION_TIMER_INDEX);
         this.timerOptionRow = new Adw.ActionRow({
-            title: _("Durations"),
+            title: _('Durations'),
             activatable: true
         });
 
@@ -128,7 +124,7 @@ class Caffeine_GeneralPage extends Adw.PreferencesPage {
             lower: 0,
             upper: 4,
             step_increment: 0.1,
-            page_increment: 1,      
+            page_increment: 1,
             value: durationIndex
         });
         this._updateTimerDuration(durationIndex);
@@ -164,7 +160,7 @@ class Caffeine_GeneralPage extends Adw.PreferencesPage {
             vexpand: false
         });
         let shortcutGroup = new Adw.PreferencesGroup({
-            title: _("Shortcut"),
+            title: _('Shortcut'),
             header_suffix: deleteShortcutButton
         });
 
@@ -172,12 +168,12 @@ class Caffeine_GeneralPage extends Adw.PreferencesPage {
         this.shortcutKeyBoard = new ShortcutSettingWidget(
             this._settings,
             this._settingsKey.TOGGLE_SHORTCUT,
-            _("Toggle shortcut"),
-            _("Use Backspace to clear")
+            _('Toggle shortcut'),
+            _('Use Backspace to clear')
         );
 
         // Hide/Show delete button
-        if( ! this.shortcutKeyBoard.isAcceleratorSet() ) {
+        if (!this.shortcutKeyBoard.isAcceleratorSet()) {
             deleteShortcutButton.visible = false;
         }
 
@@ -204,7 +200,7 @@ class Caffeine_GeneralPage extends Adw.PreferencesPage {
             (widget) => this._updateTimerDuration(widget.get_value()));
         deleteShortcutButton.connect('clicked', this._resetShortcut.bind(this));
         this._settings.connect(`changed::${this._settingsKey.TOGGLE_SHORTCUT}`, () => {
-            if( this.shortcutKeyBoard.isAcceleratorSet() ) {
+            if (this.shortcutKeyBoard.isAcceleratorSet()) {
                 deleteShortcutButton.visible = true;
             } else {
                 deleteShortcutButton.visible = false;
@@ -214,7 +210,7 @@ class Caffeine_GeneralPage extends Adw.PreferencesPage {
 
     _updateTimerDuration(value) {
         const durationIndex = this._settings.get_int(this._settingsKey.DURATION_TIMER_INDEX);
-        this.timerOptionRow.set_subtitle(_("Set to ") + TIMERS_DURATION[value] + _(" minutes"));
+        this.timerOptionRow.set_subtitle(_('Set to ') + TIMERS_DURATION[value] + _(' minutes'));
         if (durationIndex !== value) {
             this._settings.set_int(this._settingsKey.DURATION_TIMER_INDEX, value);
         }
@@ -232,19 +228,19 @@ const ShortcutSettingWidget = class extends Adw.ActionRow {
     static {
         GObject.registerClass({
             Properties: {
-                shortcut: genParam('string', 'shortcut', ''),
+                shortcut: genParam('string', 'shortcut', '')
             },
             Signals: {
-                changed: { param_types: [GObject.TYPE_STRING] },
-            },
+                changed: { param_types: [GObject.TYPE_STRING] }
+            }
         }, this);
     }
 
     constructor(settings, key, label, sublabel) {
         super({
-              title: label,
-              subtitle: sublabel,
-              activatable: true
+            title: label,
+            subtitle: sublabel,
+            activatable: true
         });
 
         this.shortcutBox = new Gtk.Box({
@@ -278,7 +274,7 @@ const ShortcutSettingWidget = class extends Adw.ActionRow {
     }
 
     isAcceleratorSet() {
-        if(this.shortLabel.get_accelerator()) {
+        if (this.shortLabel.get_accelerator()) {
             return true;
         } else {
             return false;
@@ -295,7 +291,7 @@ const ShortcutSettingWidget = class extends Adw.ActionRow {
         let content = new Adw.StatusPage({
             title: _('New accelerator…'),
             description: this._description,
-            icon_name: 'preferences-desktop-keyboard-shortcuts-symbolic',
+            icon_name: 'preferences-desktop-keyboard-shortcuts-symbolic'
         });
 
         this._editor = new Adw.Window({
@@ -304,7 +300,7 @@ const ShortcutSettingWidget = class extends Adw.ActionRow {
             transient_for: widget.get_root(),
             width_request: 480,
             height_request: 320,
-            content,
+            content
         });
 
         this._editor.add_controller(ctl);
@@ -326,8 +322,9 @@ const ShortcutSettingWidget = class extends Adw.ActionRow {
             return Gdk.EVENT_STOP;
         }
 
-        if (!this.isValidBinding(mask, keycode, keyval) || !this.isValidAccel(mask, keyval))
+        if (!this.isValidBinding(mask, keycode, keyval) || !this.isValidAccel(mask, keyval)) {
             return Gdk.EVENT_STOP;
+        }
 
         this.saveShortcut(keyval, keycode, mask);
         return Gdk.EVENT_STOP;
@@ -335,7 +332,7 @@ const ShortcutSettingWidget = class extends Adw.ActionRow {
 
     saveShortcut(keyval, keycode, mask) {
         if (!keyval && !keycode) {
-            this.shortcut = "";
+            this.shortcut = '';
         } else {
             this.shortcut = Gtk.accelerator_name_with_keycode(null, keyval, keycode, mask);
         }
@@ -364,12 +361,12 @@ const ShortcutSettingWidget = class extends Adw.ActionRow {
             Gdk.KEY_KP_Enter,
             Gdk.KEY_Return,
 
-            Gdk.KEY_Mode_switch,
+            Gdk.KEY_Mode_switch
         ].includes(keyval);
     }
 
     isValidBinding(mask, keycode, keyval) {
-        return !(mask === 0 || mask === Gdk.SHIFT_MASK && keycode !== 0 &&
+        return !(mask === 0 || mask === Gdk.ModifierType.SHIFT_MASK && keycode !== 0 &&
                  ((keyval >= Gdk.KEY_a && keyval <= Gdk.KEY_z) ||
                      (keyval >= Gdk.KEY_A && keyval <= Gdk.KEY_Z) ||
                      (keyval >= Gdk.KEY_0 && keyval <= Gdk.KEY_9) ||
