@@ -8,6 +8,8 @@ The following Gnome Shell extensions are stored in this repository:
 
 - **AlphabeticalAppGrid @stuarthayhurst**: Restore the alphabetical ordering of the app grid.
 - **asusctl-gex @asus-linux**: Extension for visualizing asusctl(asusd) settings and status..
+  > [!WARNING]
+  > Incompatible with gnome 45
 - **bluetooth-quick-connect @bjarosze**: Allows quick and easy connection to Bluetooth devices directly from the control panel.
 - **blur-my-shell @aunetx**: Adds a blur effect to various elements of the Gnome Shell, giving a sleek and modern look.
 - **caffeine @patapon**: Prevents the system from suspending or activating the screensaver when active.
@@ -17,19 +19,19 @@ The following Gnome Shell extensions are stored in this repository:
 - **gnome-extension-brightness @bruno.englert**: Adds brightness controls to the control panel for easy adjustment.
 - **gtktitlebar @velitasali**: Removes the title bar from maximized windows, saving screen space.
 - **just-perfection-desktop @just-perfection**: Customizes the desktop layout, including the taskbar, app menu, and system tray.
-- **netspeed @alynx.one**: Displays network speed indicators in the top bar.
-  > **Warning**: Incompatible with Gnome 44
 - **netspeed simplified @prateekmedia**: Displays network speed indicators in the top bar.
-  > **Note**: Compatible with Gnome 44
+  > [!NOTE]
+  > Compatible with Gnome 44, 45
 - **openweather-extension @jenslody**: Provides weather information in the top bar, including current conditions and forecasts.
 - **quick-settings-tweaks @qwreey**: Adds additional settings and tweaks to the Gnome Shell top bar.
 - **reorder-workspaces @jer**: Allows reordering of workspaces in the Activities Overview.
-- **scroll-workspaces @gfxmonk**: Enables scrolling through workspaces using the mouse wheel or touchpad gestures.
+- **panellScroll @sun.wxg**: Enables scrolling through workspaces using the mouse wheel or touchpad gestures.
 - **supergfxctl-gex @asus-linux**: Adds advanced graphics settings and control for ASUS laptops.
 - **top-bar-organizer @julian.gse.jsts**: Allows customization and organization of items in the top bar.
 - **unite @hardpixel.eu**: Combines the title bar and top bar to save vertical screen space.
-- **hanabi-extension @jeffshee**: Live wallpaper for gnome
-- **focus-follows-workspace @christopher**: Focus follows workspace on the primary monitor.
+- **hanabi-extension @jeffshee**: Live wallpaper for gnome.
+- **gnome-ui-tune @itstime.tech**: some of the subtle yet ease of life improvements for gnome ui.
+- **dash-to-dock @micxgx**: customization options for gnome dash.
 
 These extensions provide additional functionality, customization options, and convenience features to enhance your Gnome Shell experience.
 
