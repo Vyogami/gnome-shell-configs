@@ -7,6 +7,23 @@ We go to the next version after each release on
 
 ## [Unreleased]
 
+## [27.0.0 Durer] - 2023-09-14
+
+### Changed
+
+- The world clocks visibility from css to js.
+
+### Added
+
+- Almost none to animation speed feature (GNOME Shell 45).
+- GNOME Shell 45 Support.
+- Japanese Translation by [@gnuey56](https://gitlab.gnome.org/gnuey56).
+
+### Removed
+
+- Activities button icon feature (GNOME Shell 45).
+- App menu indicator (GNOME Shell 45).
+
 ## [26.0.0 Rosa] - 2023-08-07
 
 ### Fixed
