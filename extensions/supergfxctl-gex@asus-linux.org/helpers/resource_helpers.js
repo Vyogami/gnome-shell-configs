@@ -1,16 +1,17 @@
-const Me = imports.misc.extensionUtils.getCurrentExtension();
-const { Gio, GLib } = imports.gi;
-const Log = Me.imports.modules.log;
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import * as Log from '../modules/log.js';
 
-var File = class File {
-    static DBus(name) {
-        const file = `${Me.path}/resources/dbus/${name}.xml`;
+export class File {
+    static DBus(name, path = '') {
+        const decoder = new TextDecoder();
+        const file = `${path}/resources/dbus/${name}.xml`;
 
         try {
             const [ok, bytes] = GLib.file_get_contents(file);
             if (!ok)
                 Log.warn(`Couldn't read contents of "${file}"`);
-            return ok ? imports.byteArray.toString(bytes) : undefined;
+            return ok ? decoder.decode(bytes) : undefined;
         }
         catch (e) {
             Log.error(`Failed to load "${file}"`, e);
@@ -18,10 +19,9 @@ var File = class File {
     }
 }
 
-var Icon = class Icon {
+export class Icon {
     static getByName(name) {
-        const iconPath = 'resource://org/gnome/Shell/Extensions/supergfxctl-gex/icons/scalable';
-        const iconNames = [
+        if ([
             'dgpu-active',
             'dgpu-off',
             'dgpu-suspended',
@@ -40,16 +40,11 @@ var Icon = class Icon {
             'gpu-vfio-active',
             'gpu-vfio',
             'reboot',
-        ];
-        const res = {};
-
-        for (let iconName of iconNames) {
-            res[iconName] = new Gio.FileIcon({
-                file: Gio.File.new_for_uri(`${iconPath}/${iconName}.svg`),
+        ].some((s) => s === name)) {
+            return new Gio.FileIcon({
+                file: Gio.File.new_for_uri(`resource://org/gnome/Shell/Extensions/supergfxctl-gex/icons/scalable/${name}.svg`),
             });
         }
-        if (res[name] !== undefined)
-            return res[name];
         return new Gio.ThemedIcon({ name: name });
     }
 }

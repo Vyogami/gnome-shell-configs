@@ -1,7 +1,7 @@
-const Config = imports.misc.config;
+import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 const [major] = Config.PACKAGE_VERSION.split('.').map((s) => Number(s));
 
-var VersionHelper = class VersionHelper {
+export class VersionHelper {
     curVersion;
     allowedSgfxVersions = [
         [5, 0, 0],

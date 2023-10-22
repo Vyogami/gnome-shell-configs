@@ -1,16 +1,6 @@
-const Me = imports.misc.extensionUtils.getCurrentExtension();
-const { VersionHelper } = Me.imports.helpers.version_helper;
+import { VersionHelper } from './version_helper.js';
 
-var LabelType;
-(function (LabelType) {
-    LabelType[LabelType["Gfx"] = 0] = "Gfx";
-    LabelType[LabelType["GfxMenu"] = 1] = "GfxMenu";
-    LabelType[LabelType["Power"] = 2] = "Power";
-    LabelType[LabelType["PowerFileName"] = 3] = "PowerFileName";
-    LabelType[LabelType["UserAction"] = 4] = "UserAction";
-})(LabelType || (LabelType = {}));
-
-var LabelHelper = class LabelHelper {
+export class LabelHelper {
     _gfxLabels = [
         'hybrid',
         'integrated',
@@ -41,7 +31,7 @@ var LabelHelper = class LabelHelper {
         'off',
         'off',
         'active',
-        'active',
+        'gpu-integrated-active',
     ];
     _userAction = [
         'logout',
@@ -64,17 +54,17 @@ var LabelHelper = class LabelHelper {
     }
 
     gfxLabels(type) {
-        if (!(type === LabelType.Gfx || type === LabelType.GfxMenu) ||
+        if (!(type === 0 || type === 1) ||
             !this.vHelper.isBetween(this.vHelper.currentVersion, this.vHelper.allowedSgfxVersions)) {
             return [];
         }
 
         switch (type) {
-            case LabelType.Gfx:
+            case 0:
                 return this._gfxLabels
                     .slice(0, 2)
                     .concat(this.v50 ? [] : this.v51 ? ['nvidianomodeset'] : [], this._gfxLabels.slice(-4));
-            case LabelType.GfxMenu:
+            case 1:
                 return this._gfxLabelsMenu
                     .slice(0, 2)
                     .concat(this.v50 ? [] : this.v51 ? ['Nvidia (no modeset)'] : [], this._gfxLabelsMenu.slice(-4));
@@ -92,14 +82,14 @@ var LabelHelper = class LabelHelper {
     get(type, idx) {
 
         switch (type) {
-            case LabelType.Gfx:
-            case LabelType.GfxMenu:
+            case 0:
+            case 1:
                 return this.gfxLabels(type)[idx];
-            case LabelType.Power:
+            case 2:
                 return this._powerLabel[idx];
-            case LabelType.PowerFileName:
+            case 3:
                 return this._powerLabelFilename[idx];
-            case LabelType.UserAction:
+            case 4:
                 return this.userActions[idx];
             default:
                 return '';
@@ -110,17 +100,18 @@ var LabelHelper = class LabelHelper {
         return this.get(type, idx) === comp;
     }
 
-    get v50() {
+    isVersion(major = 5, minor = 0) {
         return this.vHelper.isBetween(this.vHelper.currentVersion, [
-            [5, 0, 0],
-            [5, 0, 9999],
+            [major, minor, 0],
+            [major, minor, 9999],
         ]);
     }
 
+    get v50() {
+        return this.isVersion(5, 0);
+    }
+
     get v51() {
-        return this.vHelper.isBetween(this.vHelper.currentVersion, [
-            [5, 1, 0],
-            [5, 1, 9999],
-        ]);
+        return this.isVersion(5, 1);
     }
 }

@@ -1,14 +1,14 @@
-const Me = imports.misc.extensionUtils.getCurrentExtension();
-const Util = imports.misc.util;
-const { main, messageTray } = imports.ui;
-const Resources = Me.imports.helpers.resource_helpers;
+import * as Util from 'resource:///org/gnome/shell/misc/util.js';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
+import * as Resources from './resource_helpers.js';
 
-var PanelHelper = class PanelHelper {
+export class PanelHelper {
     static notify(details, icon, action = '', urgency = 2) {
         const params = { gicon: Resources.Icon.getByName(icon) };
-        const source = new messageTray.Source('Super Graphics Control', icon, params);
-        const notification = new messageTray.Notification(source, 'Super Graphics Control', details, params);
-        main.messageTray.add(source);
+        const source = new MessageTray.Source('Graphics', icon, params);
+        const notification = new MessageTray.Notification(source, 'Graphics', details, params);
+        Main.messageTray.add(source);
         notification.setTransient(true);
 
         switch (action) {
